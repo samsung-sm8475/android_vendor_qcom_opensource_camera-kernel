@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_SUBDEV_H_
@@ -18,9 +17,7 @@
 #define CAM_SUBDEVICE_EVENT_MAX 30
 
 enum cam_subdev_message_type_t {
-	CAM_SUBDEV_MESSAGE_REG_DUMP = 0x1,
-	CAM_SUBDEV_MESSAGE_APPLY_CSIPHY_AUX,
-	CAM_SUBDEV_MESSAGE_CLOCK_UPDATE
+	CAM_SUBDEV_MESSAGE_IRQ_ERR = 0x1
 };
 
 /* Enum for close sequence priority */
@@ -30,9 +27,16 @@ enum cam_subdev_close_seq_priority {
 	CAM_SD_CLOSE_LOW_PRIORITY
 };
 
-enum cam_subdev_rwsem {
-	CAM_SUBDEV_LOCK = 1,
-	CAM_SUBDEV_UNLOCK,
+/**
+ * struct cam_subdev_msg_payload - describes a subdev message payload
+ *
+ * @hw_idx 		   : Hw index of the recipent module
+ * @priv_data		   : Private data
+ *
+ */
+struct cam_subdev_msg_payload {
+	 uint8_t								hw_idx;
+	 void								   *priv_data;
 };
 
 /**
@@ -73,7 +77,7 @@ struct cam_subdev {
 	void                                  (*msg_cb)(
 					struct v4l2_subdev *sd,
 					enum cam_subdev_message_type_t msg_type,
-					void *data);
+					struct cam_subdev_msg_payload *data);
 	struct list_head                       list;
 	enum cam_subdev_close_seq_priority     close_seq_prior;
 };
@@ -90,7 +94,7 @@ struct cam_subdev {
  */
 void cam_subdev_notify_message(u32 subdev_type,
 		enum cam_subdev_message_type_t message_type,
-		void *data);
+		struct cam_subdev_msg_payload *data);
 
 /**
  * cam_subdev_probe()
@@ -136,15 +140,6 @@ int cam_register_subdev(struct cam_subdev *sd);
  * @sd:                    Pointer to struct cam_subdev.
  */
 int cam_unregister_subdev(struct cam_subdev *sd);
-
-/**
- * cam_req_mgr_rwsem_read_op()
- *
- * @brief : API to acquire read semaphore lock to platform framework.
- *
- * @lock  : value indicates to lock or unlock the read lock
- */
-void cam_req_mgr_rwsem_read_op(enum cam_subdev_rwsem lock);
 
 /**
  * cam_req_mgr_is_open()

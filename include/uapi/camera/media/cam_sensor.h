@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only WITH Linux-syscall-note */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __UAPI_CAM_SENSOR_H__
@@ -19,13 +18,6 @@
 
 #define SKEW_CAL_MASK             BIT(1)
 #define PREAMBLE_PATTEN_CAL_MASK  BIT(2)
-
-#define CAM_SENSOR_GET_QUERY_CAP_V2
-/* Sensor Driver cmd buffer meta type */
-#define CAM_SENSOR_PACKET_GENERIC_BLOB             1
-
-/* Sensor Res Blob Type */
-#define CAM_SENSOR_GENERIC_BLOB_RES_INFO           0
 
 enum camera_sensor_cmd_type {
 	CAMERA_SENSOR_CMD_TYPE_INVALID,
@@ -100,13 +92,12 @@ enum cam_sensor_packet_opcodes {
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_PROBE,
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_CONFIG,
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_STREAMOFF,
+	CAM_SENSOR_PACKET_OPCODE_SENSOR_MODE,
+	CAM_SENSOR_PACKET_OPCODE_SENSOR_SHOOTINGMODE,
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_READ,
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_FRAME_SKIP_UPDATE,
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_PROBE_V2,
-	CAM_SENSOR_PACKET_OPCODE_SENSOR_REG_BANK_UNLOCK,
-	CAM_SENSOR_PACKET_OPCODE_SENSOR_REG_BANK_LOCK,
-	CAM_SENSOR_PACKET_OPCODE_SENSOR_RESCONFIG = 126,
-	CAM_SENSOR_PACKET_OPCODE_SENSOR_NOP = 127,
+	CAM_SENSOR_PACKET_OPCODE_SENSOR_NOP = 127
 };
 
 enum tpg_command_type_t {
@@ -314,6 +305,10 @@ struct cam_ois_opcode {
  * @ois_fw_flag           :    indicates if fw is present or not
  * @is_ois_calib          :    indicates the calibration data is available
  * @ois_name              :    OIS name
+ * @gyro_raw_x            :    gyro_raw_x
+ * @gyro_raw_y            :    gyro_raw_y
+ * @gyro_raw_z            :    gyro_raw_z
+ * @efs_cal               :    EFS CAL
  * @opcode                :    opcode
  */
 struct cam_cmd_ois_info {
@@ -322,6 +317,12 @@ struct cam_cmd_ois_info {
 	__u8                  cmd_type;
 	__u8                  ois_fw_flag;
 	__u8                  is_ois_calib;
+#if 1
+	__u32                 gyro_raw_x;
+	__u32                 gyro_raw_y;
+	__u32                 gyro_raw_z;
+	__u32                 efs_cal;
+#endif
 	char                  ois_name[MAX_OIS_NAME_SIZE];
 	struct cam_ois_opcode opcode;
 } __attribute__((packed));
@@ -558,6 +559,7 @@ struct cam_csiphy_info {
 	__u8     secure_mode;
 	__u64    settle_time;
 	__u64    data_rate;
+	__u16    shooting_mode;
 } __attribute__((packed));
 
 /**
@@ -609,6 +611,17 @@ struct cam_tpg_acquire_dev {
 	__u32    handle_type;
 	__u32    reserved;
 	__u64    info_handle;
+} __attribute__((packed));
+
+/**
+ * cam_sensor_release_dev : Updates sensor acuire cmd
+ * @session_handle :    Session handle for acquiring device
+ * @device_handle  :    Updates device handle
+ *
+ */
+struct cam_sensor_release_dev {
+	__u32    session_handle;
+	__u32    device_handle;
 } __attribute__((packed));
 
 /**
@@ -845,57 +858,5 @@ struct cam_flash_query_cap_info {
 	__u32    max_duration_flash[CAM_FLASH_MAX_LED_TRIGGERS];
 	__u32    max_current_torch[CAM_FLASH_MAX_LED_TRIGGERS];
 } __attribute__ ((packed));
-
-/**
- * struct cam_flash_query_cap_v2  :  capabilities info for flash
- *
- * @version             :  Version to indicate the change
- * @slot_info           :  Indicates about the slotId or cell Index
- * @max_current_flash   :  max supported current for flash
- * @max_duration_flash  :  max flash turn on duration
- * @max_current_torch   :  max supported current for torch
- * @flash_type          :  Flag to indicate flash type (i2c/pmic)
- * @num_valid_params    :  Number of valid params to pass
- * @param_mask          :  Param mask for the params passed
- * @params              :  Array to contain future parameters
- *
- */
-struct cam_flash_query_cap_info_v2 {
-	__u32    version;
-	__u32    slot_info;
-	__u32    max_current_flash[CAM_FLASH_MAX_LED_TRIGGERS];
-	__u32    max_duration_flash[CAM_FLASH_MAX_LED_TRIGGERS];
-	__u32    max_current_torch[CAM_FLASH_MAX_LED_TRIGGERS];
-	__u32    flash_type;
-	__u32    num_valid_params;
-	__u32    param_mask;
-	__u32    params[3];
-} __attribute__ ((packed));
-
-/**
- * struct cam_cmd_sensor_res_info - Contains sensor res info
- *
- * res_index is the key property, it specifies the
- * combinations of other properties enclosed in this
- * structure.
- *
- * @version           :Version to indicate the change
- * @res_index         : Sensor resolution index
- * @num_batched_frames: Number of batched frames
- * @num_valid_params  : Number of valid params
- * @valid_param_mask  : Valid param mask
- * @params            : params
- */
-struct cam_sensor_res_info {
-	__u32 version;
-	__u16 res_index;
-	__u16 num_batched_frames;
-	__u32 num_valid_params;
-	__u32 valid_param_mask;
-	__u16 params[4];
-} __attribute__((packed));
-
-#define VIDIOC_MSM_CCI_CFG \
-	_IOWR('V', BASE_VIDIOC_PRIVATE + 23, struct cam_cci_ctrl)
 
 #endif

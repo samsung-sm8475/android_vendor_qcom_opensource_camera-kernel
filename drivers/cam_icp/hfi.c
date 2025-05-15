@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/io.h>
@@ -36,10 +35,10 @@
 /* TO DO Lower timeout value */
 #define HFI_POLL_DELAY_US 10
 #define HFI_POLL_TIMEOUT_US 1500000
+#define HFI_MAX_POLL_RETRY 5
 
 static struct hfi_info *g_hfi;
 unsigned int g_icp_mmu_hdl;
-
 static DEFINE_MUTEX(hfi_cmd_q_mutex);
 static DEFINE_MUTEX(hfi_msg_q_mutex);
 
@@ -115,7 +114,7 @@ void cam_hfi_mini_dump(struct hfi_mini_dump_info *dst)
 	dst->cmd_q_state = g_hfi->cmd_q_state;
 }
 
-void cam_hfi_queue_dump(bool dump_queue_data)
+void cam_hfi_queue_dump(void)
 {
 	struct hfi_mem_info *hfi_mem = &g_hfi->map;
 	struct hfi_qtbl *qtbl;
@@ -129,7 +128,7 @@ void cam_hfi_queue_dump(bool dump_queue_data)
 	}
 
 	qtbl = (struct hfi_qtbl *)hfi_mem->qtbl.kva;
-	CAM_INFO(CAM_HFI,
+	CAM_DBG(CAM_HFI,
 		"qtbl header: version=0x%08x tbl_size=%u numq=%u qhdr_size=%u",
 		qtbl->q_tbl_hdr.qtbl_version,
 		qtbl->q_tbl_hdr.qtbl_size,
@@ -137,7 +136,7 @@ void cam_hfi_queue_dump(bool dump_queue_data)
 		qtbl->q_tbl_hdr.qtbl_qhdr_size);
 
 	q_hdr = &qtbl->q_hdr[Q_CMD];
-	CAM_INFO(CAM_HFI,
+	CAM_DBG(CAM_HFI,
 		"cmd_q: addr=0x%08x size=%u read_idx=%u write_idx=%u",
 		hfi_mem->cmd_q.iova,
 		q_hdr->qhdr_q_size,
@@ -147,11 +146,10 @@ void cam_hfi_queue_dump(bool dump_queue_data)
 	dwords = (uint32_t *)hfi_mem->cmd_q.kva;
 	num_dwords = ICP_CMD_Q_SIZE_IN_BYTES >> BYTE_WORD_SHIFT;
 
-	if (dump_queue_data)
-		hfi_queue_dump(dwords, num_dwords);
+	hfi_queue_dump(dwords, num_dwords);
 
 	q_hdr = &qtbl->q_hdr[Q_MSG];
-	CAM_INFO(CAM_HFI,
+	CAM_DBG(CAM_HFI,
 		"msg_q: addr=0x%08x size=%u read_idx=%u write_idx=%u",
 		hfi_mem->msg_q.iova,
 		q_hdr->qhdr_q_size,
@@ -161,8 +159,7 @@ void cam_hfi_queue_dump(bool dump_queue_data)
 	dwords = (uint32_t *)hfi_mem->msg_q.kva;
 	num_dwords = ICP_MSG_Q_SIZE_IN_BYTES >> BYTE_WORD_SHIFT;
 
-	if (dump_queue_data)
-		hfi_queue_dump(dwords, num_dwords);
+	hfi_queue_dump(dwords, num_dwords);
 }
 
 int hfi_write_cmd(void *cmd_ptr)
@@ -267,7 +264,7 @@ int hfi_read_message(uint32_t *pmsg, uint8_t q_id,
 		return -EINVAL;
 	}
 
-	if (q_id > Q_DBG) {
+	if (!((q_id == Q_MSG) || (q_id == Q_DBG))) {
 		CAM_ERR(CAM_HFI, "Invalid q :%u", q_id);
 		return -EINVAL;
 	}
@@ -297,13 +294,11 @@ int hfi_read_message(uint32_t *pmsg, uint8_t q_id,
 		goto err;
 	}
 
-	if (q_id == Q_MSG) {
+	size_upper_bound = q->qhdr_q_size;
+	if (q_id == Q_MSG)
 		read_q = (uint32_t *)g_hfi->map.msg_q.kva;
-		size_upper_bound = ICP_HFI_MAX_PKT_SIZE_MSGQ_IN_WORDS;
-	} else {
+	else
 		read_q = (uint32_t *)g_hfi->map.dbg_q.kva;
-		size_upper_bound = ICP_HFI_MAX_PKT_SIZE_IN_WORDS;
-	}
 
 	read_ptr = (uint32_t *)(read_q + q->qhdr_read_idx);
 	write_ptr = (uint32_t *)(read_q + q->qhdr_write_idx);
@@ -312,12 +307,7 @@ int hfi_read_message(uint32_t *pmsg, uint8_t q_id,
 		size_in_words = write_ptr - read_ptr;
 	else {
 		word_diff = read_ptr - write_ptr;
-		if (q_id == Q_MSG)
-			size_in_words = (ICP_MSG_Q_SIZE_IN_BYTES >>
-			BYTE_WORD_SHIFT) - word_diff;
-		else
-			size_in_words = (ICP_DBG_Q_SIZE_IN_BYTES >>
-			BYTE_WORD_SHIFT) - word_diff;
+        size_in_words =  q->qhdr_q_size -  word_diff;
 	}
 
 	if ((size_in_words == 0) ||
@@ -464,9 +454,6 @@ int hfi_set_debug_level(u64 icp_dbg_type, uint32_t lvl)
 	if (lvl > val)
 		return -EINVAL;
 
-	if (g_hfi)
-		g_hfi->dbg_lvl = lvl;
-
 	size = sizeof(struct hfi_cmd_prop) +
 		sizeof(struct hfi_debug);
 
@@ -518,50 +505,6 @@ int hfi_set_fw_dump_level(uint32_t lvl)
 			 fw_dump_level_switch_prop->num_prop,
 			 fw_dump_level_switch_prop->prop_data[0],
 			 fw_dump_level_switch_prop->prop_data[1]);
-
-	hfi_write_cmd(prop);
-	kfree(prop);
-	return 0;
-}
-
-int hfi_send_freq_info(int32_t freq)
-{
-	uint8_t *prop = NULL;
-	struct hfi_cmd_prop *dbg_prop = NULL;
-	uint32_t size = 0;
-
-	if (!g_hfi) {
-		CAM_ERR(CAM_HFI, "HFI interface not setup");
-		return -ENODEV;
-	}
-
-	if (!(g_hfi->dbg_lvl & HFI_DEBUG_MSG_PERF))
-		return -EINVAL;
-
-	size = sizeof(struct hfi_cmd_prop) + sizeof(freq);
-	prop = kzalloc(size, GFP_KERNEL);
-	if (!prop)
-		return -ENOMEM;
-
-	dbg_prop = (struct hfi_cmd_prop *)prop;
-	dbg_prop->size = size;
-	dbg_prop->pkt_type = HFI_CMD_SYS_SET_PROPERTY;
-	dbg_prop->num_prop = 1;
-	dbg_prop->prop_data[0] = HFI_PROPERTY_SYS_ICP_HW_FREQUENCY;
-	dbg_prop->prop_data[1] = freq;
-
-	CAM_DBG(CAM_HFI, "prop->size = %d\n"
-			 "prop->pkt_type = %d\n"
-			 "prop->num_prop = %d\n"
-			 "prop->prop_data[0] = %d\n"
-			 "prop->prop_data[1] = %d\n"
-			 "dbg_lvl = 0x%x\n",
-			 dbg_prop->size,
-			 dbg_prop->pkt_type,
-			 dbg_prop->num_prop,
-			 dbg_prop->prop_data[0],
-			 dbg_prop->prop_data[1],
-			 g_hfi->dbg_lvl);
 
 	hfi_write_cmd(prop);
 	kfree(prop);
@@ -671,6 +614,17 @@ int hfi_get_hw_caps(void *query_buf)
 	return 0;
 }
 
+void cam_hfi_dump_response_registers(void)
+{
+	void __iomem *icp_base = hfi_iface_addr(g_hfi);
+
+	if (!icp_base)
+		return;
+
+	CAM_INFO(CAM_ICP, "Init response after suspend failure 0x%x",
+		cam_io_r_mb(icp_base + HFI_REG_ICP_HOST_INIT_RESPONSE));
+}
+
 int cam_hfi_resume(struct hfi_mem_info *hfi_mem)
 {
 	int rc = 0;
@@ -685,7 +639,7 @@ int cam_hfi_resume(struct hfi_mem_info *hfi_mem)
 	if (cam_common_read_poll_timeout(icp_base +
 		    HFI_REG_ICP_HOST_INIT_RESPONSE,
 		    HFI_POLL_DELAY_US, HFI_POLL_TIMEOUT_US,
-		    (uint32_t)UINT_MAX, ICP_INIT_RESP_SUCCESS, &status)) {
+		    0xFFFFFFFF, ICP_INIT_RESP_SUCCESS, &status)) {
 	    CAM_ERR(CAM_HFI, "response poll timed out: status=0x%08x",
 		    status);
 	    return -ETIMEDOUT;
@@ -755,6 +709,7 @@ int cam_hfi_init(struct hfi_mem_info *hfi_mem, const struct hfi_ops *hfi_ops,
 	struct hfi_q_hdr *cmd_q_hdr, *msg_q_hdr, *dbg_q_hdr;
 	struct sfr_buf *sfr_buffer;
 	void __iomem *icp_base;
+	int retry_cnt = 0;
 
 	if (!hfi_mem || !hfi_ops || !priv) {
 		CAM_ERR(CAM_HFI,
@@ -954,13 +909,33 @@ int cam_hfi_init(struct hfi_mem_info *hfi_mem, const struct hfi_ops *hfi_ops,
 		hfi_mem->qtbl.iova, hfi_mem->qtbl.len,
 		hfi_mem->sfr_buf.iova, hfi_mem->sfr_buf.len);
 
-	if (cam_common_read_poll_timeout(icp_base +
-		    HFI_REG_ICP_HOST_INIT_RESPONSE,
-		    HFI_POLL_DELAY_US, HFI_POLL_TIMEOUT_US,
-		    (uint32_t)UINT_MAX, ICP_INIT_RESP_SUCCESS, &status)) {
-		CAM_ERR(CAM_HFI, "response poll timed out: status=0x%08x",
-			status);
-		rc = -ETIMEDOUT;
+	while (retry_cnt < HFI_MAX_POLL_RETRY) {
+		if (cam_common_read_poll_timeout(icp_base +
+			HFI_REG_ICP_HOST_INIT_RESPONSE,
+			HFI_POLL_DELAY_US, HFI_POLL_TIMEOUT_US,
+		    0xFFFFFFFF, ICP_INIT_RESP_SUCCESS, &status)) {
+			CAM_INFO(CAM_HFI, "1: status = %u", status);
+			status = cam_io_r_mb(icp_base +
+				HFI_REG_ICP_HOST_INIT_RESPONSE);
+			CAM_INFO(CAM_HFI, "2: status = %u", status);
+
+			if (status == ICP_INIT_RESP_SUCCESS) {
+				break;
+			} else if (status == ICP_INIT_RESP_FAILED){
+				CAM_ERR(CAM_HFI, "response poll timed out: status=0x%08x",
+					status);
+				rc = -ETIMEDOUT;
+				goto regions_fail;
+			}
+		} else {
+			break;
+		}
+		retry_cnt++;
+	}
+
+	if ((retry_cnt == HFI_MAX_POLL_RETRY) &&
+		(status != ICP_INIT_RESP_SUCCESS)) {
+		CAM_ERR(CAM_HFI, "Reached Max retries. status = %u", status);
 		goto regions_fail;
 	}
 

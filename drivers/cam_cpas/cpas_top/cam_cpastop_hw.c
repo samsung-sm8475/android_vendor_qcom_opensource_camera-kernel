@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/delay.h>
@@ -35,14 +34,11 @@
 #include "cpastop_v680_110.h"
 #include "cpastop_v165_100.h"
 #include "cpastop_v780_100.h"
-#include "cpastop_v640_200.h"
-#include "cpastop_v640_210.h"
 #include "cam_req_mgr_workq.h"
 #include "cam_common_util.h"
 
 struct cam_camnoc_info *camnoc_info;
 struct cam_cpas_camnoc_qchannel *qchannel_info;
-struct cam_cpas_top_regs *cpas_top_info;
 
 
 #define CAMNOC_SLAVE_MAX_ERR_CODE 7
@@ -67,7 +63,6 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
-		0,
 	},
 	/* for camera_170 */
 	{
@@ -77,7 +72,6 @@ static const uint32_t cam_cpas_hw_version_map
 		CAM_CPAS_TITAN_170_V120,
 		0,
 		CAM_CPAS_TITAN_170_V200,
-		0,
 	},
 	/* for camera_175 */
 	{
@@ -87,12 +81,10 @@ static const uint32_t cam_cpas_hw_version_map
 		CAM_CPAS_TITAN_175_V120,
 		CAM_CPAS_TITAN_175_V130,
 		0,
-		0,
 	},
 	/* for camera_480 */
 	{
 		CAM_CPAS_TITAN_480_V100,
-		0,
 		0,
 		0,
 		0,
@@ -107,12 +99,10 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
-		0,
 	},
 	/* for camera_520 */
 	{
 		CAM_CPAS_TITAN_520_V100,
-		0,
 		0,
 		0,
 		0,
@@ -128,12 +118,10 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
-		0,
 	},
 	/* for camera_545 */
 	{
 		CAM_CPAS_TITAN_545_V100,
-		0,
 		0,
 		0,
 		0,
@@ -148,7 +136,6 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		CAM_CPAS_TITAN_570_V200,
-		0,
 	},
 	/* for camera_680 */
 	{
@@ -158,12 +145,10 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
-		0,
 	},
 	/* for camera_165 */
 	{
 		CAM_CPAS_TITAN_165_V100,
-		0,
 		0,
 		0,
 		0,
@@ -178,17 +163,6 @@ static const uint32_t cam_cpas_hw_version_map
 		0,
 		0,
 		0,
-		0,
-	},
-	/* for camera_640 */
-	{
-		0,
-		0,
-		0,
-		0,
-		0,
-		CAM_CPAS_TITAN_640_V200,
-		CAM_CPAS_TITAN_640_V210,
 	},
 };
 
@@ -248,9 +222,6 @@ static int cam_cpas_translate_camera_cpas_version_id(
 	case CAM_CPAS_CAMERA_VERSION_780:
 		*cam_version_id = CAM_CPAS_CAMERA_VERSION_ID_780;
 		break;
-	case CAM_CPAS_CAMERA_VERSION_640:
-		*cam_version_id = CAM_CPAS_CAMERA_VERSION_ID_640;
-		break;
 
 	default:
 		CAM_ERR(CAM_CPAS, "Invalid cam version %u",
@@ -281,10 +252,6 @@ static int cam_cpas_translate_camera_cpas_version_id(
 
 	case CAM_CPAS_VERSION_200:
 		*cpas_version_id = CAM_CPAS_VERSION_ID_200;
-		break;
-
-	case CAM_CPAS_VERSION_210:
-		*cpas_version_id = CAM_CPAS_VERSION_ID_210;
 		break;
 
 	default:
@@ -772,8 +739,6 @@ static int cam_cpastop_print_poweron_settings(struct cam_hw_info *cpas_hw)
 			cam_cpas_util_reg_read(cpas_hw, CAM_CPAS_REG_CAMNOC,
 				&camnoc_info->specific[i].flag_out_set0_low);
 			cam_cpas_util_reg_read(cpas_hw, CAM_CPAS_REG_CAMNOC,
-				&camnoc_info->specific[i].dynattr_mainctl);
-			cam_cpas_util_reg_read(cpas_hw, CAM_CPAS_REG_CAMNOC,
 				&camnoc_info->specific[i].qosgen_mainctl);
 			cam_cpas_util_reg_read(cpas_hw, CAM_CPAS_REG_CAMNOC,
 				&camnoc_info->specific[i].qosgen_shaping_low);
@@ -812,8 +777,6 @@ static int cam_cpastop_poweron(struct cam_hw_info *cpas_hw)
 				&camnoc_info->specific[i].ubwc_ctl);
 			cam_cpas_util_reg_update(cpas_hw, CAM_CPAS_REG_CAMNOC,
 				&camnoc_info->specific[i].flag_out_set0_low);
-			cam_cpas_util_reg_update(cpas_hw, CAM_CPAS_REG_CAMNOC,
-				&camnoc_info->specific[i].dynattr_mainctl);
 			cam_cpas_util_reg_update(cpas_hw, CAM_CPAS_REG_CAMNOC,
 				&camnoc_info->specific[i].qosgen_mainctl);
 			cam_cpas_util_reg_update(cpas_hw, CAM_CPAS_REG_CAMNOC,
@@ -919,33 +882,6 @@ static int cam_cpastop_qchannel_handshake(struct cam_hw_info *cpas_hw,
 	return rc;
 }
 
-static int cam_cpastop_set_tpg_mux_sel(struct cam_hw_info *cpas_hw,
-	uint32_t tpg_mux)
-{
-	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
-	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
-	int reg_cpas_top;
-	uint32_t curr_tpg_mux = 0;
-
-	reg_cpas_top = cpas_core->regbase_index[CAM_CPAS_REG_CPASTOP];
-
-	if (cpas_top_info == NULL)
-		return 0;
-
-	if (!cpas_top_info->tpg_mux_sel_enabled)
-		return 0;
-
-	curr_tpg_mux = cam_io_r_mb(soc_info->reg_map[reg_cpas_top].mem_base +
-		cpas_top_info->tpg_mux_sel);
-
-	curr_tpg_mux = curr_tpg_mux | ((1 << tpg_mux) << cpas_top_info->tpg_mux_sel_shift);
-	cam_io_w_mb(curr_tpg_mux, soc_info->reg_map[reg_cpas_top].mem_base +
-		cpas_top_info->tpg_mux_sel);
-	CAM_DBG(CAM_CPAS, "SET TPG MUX to 0x%x", curr_tpg_mux);
-
-	return 0;
-}
-
 static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 	struct cam_cpas_hw_caps *hw_caps)
 {
@@ -953,7 +889,6 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 	struct cam_hw_soc_info *soc_info = &cpas_hw->soc_info;
 	struct cam_cpas *cpas_core = (struct cam_cpas *) cpas_hw->core_info;
 	qchannel_info = NULL;
-	cpas_top_info = NULL;
 
 	CAM_DBG(CAM_CPAS,
 		"hw_version=0x%x Camera Version %d.%d.%d, cpas version %d.%d.%d",
@@ -1032,17 +967,6 @@ static int cam_cpastop_init_hw_version(struct cam_hw_info *cpas_hw,
 		camnoc_info = &cam780_cpas100_camnoc_info;
 		qchannel_info = &cam780_cpas100_qchannel_info;
 		break;
-	case CAM_CPAS_TITAN_640_V200:
-		camnoc_info = &cam640_cpas200_camnoc_info;
-		qchannel_info = &cam640_cpas200_qchannel_info;
-		cpas_top_info = &cam640_cpas200_cpas_top_info;
-		break;
-	case CAM_CPAS_TITAN_640_V210:
-		camnoc_info = &cam640_cpas210_camnoc_info;
-		qchannel_info = &cam640_cpas210_qchannel_info;
-		cpas_top_info = &cam640_cpas210_cpas_top_info;
-		break;
-
 	default:
 		CAM_ERR(CAM_CPAS, "Camera Version not supported %d.%d.%d",
 			hw_caps->camera_version.major,
@@ -1114,7 +1038,6 @@ int cam_cpastop_get_internal_ops(struct cam_cpas_internal_ops *internal_ops)
 	internal_ops->print_poweron_settings =
 		cam_cpastop_print_poweron_settings;
 	internal_ops->qchannel_handshake = cam_cpastop_qchannel_handshake;
-	internal_ops->set_tpg_mux_sel = cam_cpastop_set_tpg_mux_sel;
 
 	return 0;
 }

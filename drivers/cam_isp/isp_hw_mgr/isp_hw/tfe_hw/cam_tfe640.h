@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 
@@ -1043,7 +1042,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = -1,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_5,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_1,
-			.mid[0]              = 4,
+			.mid              = 23,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_RDI1,
@@ -1051,7 +1050,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = -1,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_6,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_2,
-			.mid[0]              = 5,
+			.mid              = 24,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_RDI2,
@@ -1059,7 +1058,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = -1,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_7,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_3,
-			.mid[0]              = 6,
+			.mid              = 25,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_FULL,
@@ -1067,7 +1066,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = 4096,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_0,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 16,
+			.mid              = 16,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_RAW_DUMP,
@@ -1075,7 +1074,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = 4096,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_1,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 7,
+			.mid              = 17,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_PDAF,
@@ -1083,7 +1082,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = 4096,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_8,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 26,
+			.mid              = 25, //TBD
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_STATS_HDR_BE,
@@ -1091,7 +1090,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = -1,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_3,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 21,
+			.mid              = 21,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_STATS_HDR_BHIST,
@@ -1099,7 +1098,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = -1,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_2,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 18,
+			.mid              = 19,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_STATS_TL_BG,
@@ -1107,7 +1106,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = -1,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_2,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 17,
+			.mid              = 18,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_STATS_AWB_BG,
@@ -1115,7 +1114,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = -1,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_3,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 19,
+			.mid              = 20,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_STATS_BF,
@@ -1123,7 +1122,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = -1,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_4,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 21,
+			.mid              = 22,
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_STATS_RS,
@@ -1131,23 +1130,23 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = -1,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_10,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 27,
+			.mid              = 22, //TBD
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_DS4,
-			.max_width        = -1,
-			.max_height       = -1,
+			.max_width        = -1, //TBD
+			.max_height       = -1, //TBD
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_0,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 22,
+			.mid              = 22,  //TBD
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_DS16,
-			.max_width        = -1,
-			.max_height       = -1,
+			.max_width        = -1,  //TBD
+			.max_height       = -1,  //TBD
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_0,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 23,
+			.mid              = 22,  //TBD
 		},
 		{
 			.tfe_out_id       = CAM_TFE_BUS_TFE_OUT_AI,
@@ -1155,8 +1154,7 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 			.max_height       = 1920,
 			.composite_group  = CAM_TFE_BUS_COMP_GRP_9,
 			.rup_group_id     = CAM_TFE_BUS_RUP_GRP_0,
-			.mid[0]              = 24,
-			.mid[1]              = 25,
+			.mid              = 22, //TBD
 		},
 	},
 	.num_comp_grp             = 11,
@@ -1172,9 +1170,6 @@ static struct cam_tfe_bus_hw_info  tfe640_bus_hw_info = {
 	.support_consumed_addr = true,
 	.pdaf_rdi2_mux_en = false,
 	.rdi_width = 128,
-	.max_bw_counter_limit  = 0xFF,
-	.counter_limit_shift   = 1,
-	.counter_limit_mask    = 0xF,
 };
 
 struct cam_tfe_hw_info cam_tfe640 = {

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-mapping.h>
@@ -12,10 +11,6 @@
 #include "cam_debug_util.h"
 #include "cam_cpas_api.h"
 #include "camera_main.h"
-
-#if KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE
-#include <soc/qcom/socinfo.h>
-#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 int cam_reserve_icp_fw(struct cam_fw_alloc_info *icp_fw, size_t fw_length)
@@ -62,15 +57,13 @@ int cam_ife_notify_safe_lut_scm(bool safe_trigger)
 	uint32_t camera_hw_version, rc = 0;
 
 	rc = cam_cpas_get_cpas_hw_version(&camera_hw_version);
-	if (!rc) {
+	if (!rc && qcom_scm_smmu_notify_secure_lut(smmu_se_ife, safe_trigger)) {
 		switch (camera_hw_version) {
 		case CAM_CPAS_TITAN_170_V100:
 		case CAM_CPAS_TITAN_170_V110:
 		case CAM_CPAS_TITAN_175_V100:
-			if (qcom_scm_smmu_notify_secure_lut(smmu_se_ife, safe_trigger)) {
-				CAM_ERR(CAM_ISP, "scm call to enable safe failed");
-				rc = -EINVAL;
-			}
+			CAM_ERR(CAM_ISP, "scm call to enable safe failed");
+			rc = -EINVAL;
 			break;
 		default:
 			break;
@@ -111,11 +104,6 @@ static int camera_platform_compare_dev(struct device *dev, const void *data)
 {
 	return platform_bus_type.match(dev, (struct device_driver *) data);
 }
-
-static int camera_i2c_compare_dev(struct device *dev, const void *data)
-{
-	return i2c_bus_type.match(dev, (struct device_driver *) data);
-}
 #else
 int cam_reserve_icp_fw(struct cam_fw_alloc_info *icp_fw, size_t fw_length)
 {
@@ -149,15 +137,13 @@ int cam_ife_notify_safe_lut_scm(bool safe_trigger)
 	};
 
 	rc = cam_cpas_get_cpas_hw_version(&camera_hw_version);
-	if (!rc) {
+	if (!rc && scm_call2(SCM_SIP_FNID(0x15, 0x3), &description)) {
 		switch (camera_hw_version) {
 		case CAM_CPAS_TITAN_170_V100:
 		case CAM_CPAS_TITAN_170_V110:
 		case CAM_CPAS_TITAN_175_V100:
-			if (scm_call2(SCM_SIP_FNID(0x15, 0x3), &description)) {
-				CAM_ERR(CAM_ISP, "scm call to enable safe failed");
-				rc = -EINVAL;
-			}
+			CAM_ERR(CAM_ISP, "scm call to enable safe failed");
+			rc = -EINVAL;
 			break;
 		default:
 			break;
@@ -202,11 +188,6 @@ static int camera_platform_compare_dev(struct device *dev, void *data)
 {
 	return platform_bus_type.match(dev, (struct device_driver *) data);
 }
-
-static int camera_i2c_compare_dev(struct device *dev, void *data)
-{
-	return i2c_bus_type.match(dev, (struct device_driver *) data);
-}
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
@@ -233,7 +214,6 @@ int camera_component_match_add_drivers(struct device *master_dev,
 {
 	int i, rc = 0;
 	struct platform_device *pdev = NULL;
-	struct i2c_client *client = NULL;
 	struct device *start_dev = NULL, *match_dev = NULL;
 
 	if (!master_dev || !match_list) {
@@ -242,13 +222,13 @@ int camera_component_match_add_drivers(struct device *master_dev,
 		goto end;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(cam_component_platform_drivers); i++) {
+	for (i = 0; i < ARRAY_SIZE(cam_component_drivers); i++) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 		struct device_driver const *drv =
-			&cam_component_platform_drivers[i]->driver;
+			&cam_component_drivers[i]->driver;
 		const void *drv_ptr = (const void *)drv;
 #else
-		struct device_driver *drv = &cam_component_platform_drivers[i]->driver;
+		struct device_driver *drv = &cam_component_drivers[i]->driver;
 		void *drv_ptr = (void *)drv;
 #endif
 		start_dev = NULL;
@@ -264,33 +244,11 @@ int camera_component_match_add_drivers(struct device *master_dev,
 		put_device(start_dev);
 	}
 
-	for (i = 0; i < ARRAY_SIZE(cam_component_i2c_drivers); i++) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
-		struct device_driver const *drv =
-			&cam_component_i2c_drivers[i]->driver;
-		const void *drv_ptr = (const void *)drv;
-#else
-		struct device_driver *drv = &cam_component_i2c_drivers[i]->driver;
-		void *drv_ptr = (void *)drv;
-#endif
-		start_dev = NULL;
-		while ((match_dev = bus_find_device(&i2c_bus_type,
-			start_dev, drv_ptr, &camera_i2c_compare_dev))) {
-			put_device(start_dev);
-			client = to_i2c_client(match_dev);
-			CAM_DBG(CAM_UTIL, "Adding matched component:%s", client->name);
-			component_match_add(master_dev, match_list,
-				camera_component_compare_dev, match_dev);
-			start_dev = match_dev;
-		}
-		put_device(start_dev);
-	}
-
 end:
 	return rc;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+#if KERNEL_VERSION(5, 10, 0) <= LINUX_VERSION_CODE
 #include <linux/qcom-iommu-util.h>
 void cam_check_iommu_faults(struct iommu_domain *domain,
 	struct cam_smmu_pf_info *pf_info)
@@ -322,134 +280,5 @@ void cam_check_iommu_faults(struct iommu_domain *domain,
 	pf_info->bid = fault_ids.bid;
 	pf_info->pid = fault_ids.pid;
 	pf_info->mid = fault_ids.mid;
-}
-#endif
-
-static int inline cam_subdev_list_cmp(struct cam_subdev *entry_1, struct cam_subdev *entry_2)
-{
-	if (entry_1->close_seq_prior > entry_2->close_seq_prior)
-		return 1;
-	else if (entry_1->close_seq_prior < entry_2->close_seq_prior)
-		return -1;
-	else
-		return 0;
-}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
-void cam_smmu_util_iommu_custom(struct device *dev,
-	dma_addr_t discard_start, size_t discard_length)
-{
-	return;
-}
-
-int cam_req_mgr_ordered_list_cmp(void *priv,
-	const struct list_head *head_1, const struct list_head *head_2)
-{
-	return cam_subdev_list_cmp(list_entry(head_1, struct cam_subdev, list),
-		list_entry(head_2, struct cam_subdev, list));
-}
-
-int cam_compat_util_get_dmabuf_va(struct dma_buf *dmabuf, uintptr_t *vaddr)
-{
-	struct dma_buf_map mapping;
-	int error_code = dma_buf_vmap(dmabuf, &mapping);
-
-	if (error_code)
-		*vaddr = 0;
-	else
-		*vaddr = (mapping.is_iomem) ?
-			(uintptr_t)mapping.vaddr_iomem : (uintptr_t)mapping.vaddr;
-
-	return error_code;
-}
-
-void cam_compat_util_put_dmabuf_va(struct dma_buf *dmabuf, void *vaddr)
-{
-	struct dma_buf_map mapping = DMA_BUF_MAP_INIT_VADDR(vaddr);
-
-	dma_buf_vunmap(dmabuf, &mapping);
-}
-
-int cam_get_ddr_type(void)
-{
-	/* We assume all chipsets running kernel version 5.15+
-	 * to be using only DDR5 based memory.
-	 */
-	return DDR_TYPE_LPDDR5;
-}
-#else
-void cam_smmu_util_iommu_custom(struct device *dev,
-	dma_addr_t discard_start, size_t discard_length)
-{
-	iommu_dma_enable_best_fit_algo(dev);
-
-	if (discard_start)
-		iommu_dma_reserve_iova(dev, discard_start, discard_length);
-
-	return;
-}
-
-int cam_req_mgr_ordered_list_cmp(void *priv,
-	struct list_head *head_1, struct list_head *head_2)
-{
-	return cam_subdev_list_cmp(list_entry(head_1, struct cam_subdev, list),
-		list_entry(head_2, struct cam_subdev, list));
-}
-
-int cam_compat_util_get_dmabuf_va(struct dma_buf *dmabuf, uintptr_t *vaddr)
-{
-	int error_code = 0;
-	void *addr = dma_buf_vmap(dmabuf);
-
-	if (!addr) {
-		*vaddr = 0;
-		error_code = -ENOSPC;
-	} else {
-		*vaddr = (uintptr_t)addr;
-	}
-
-	return error_code;
-}
-
-void cam_compat_util_put_dmabuf_va(struct dma_buf *dmabuf, void *vaddr)
-{
-	dma_buf_vunmap(dmabuf, vaddr);
-}
-
-int cam_get_ddr_type(void)
-{
-	return of_fdt_get_ddrtype();
-}
-#endif
-
-#if KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE
-int cam_get_subpart_info(uint32_t *part_info, uint32_t max_num_cam)
-{
-	int rc = 0;
-	int num_cam;
-
-	num_cam = socinfo_get_part_count(PART_CAMERA);
-	CAM_DBG(CAM_CPAS, "number of cameras: %d", num_cam);
-	if (num_cam != max_num_cam) {
-		CAM_ERR(CAM_CPAS, "Unsupported number of parts: %d", num_cam);
-		return -EINVAL;
-	}
-
-	/*
-	 * If bit value in part_info is "0" then HW is available.
-	 * If bit value in part_info is "1" then HW is unavailable.
-	 */
-	rc = socinfo_get_subpart_info(PART_CAMERA, part_info, num_cam);
-	if (rc) {
-		CAM_ERR(CAM_CPAS, "Failed while getting subpart_info, rc = %d.", rc);
-		return rc;
-	}
-
-	return 0;
-}
-#else
-int cam_get_subpart_info(uint32_t *part_info, uint32_t max_num_cam)
-{
-	return 0;
 }
 #endif

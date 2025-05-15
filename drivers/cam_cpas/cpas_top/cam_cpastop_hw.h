@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CPASTOP_HW_H_
@@ -9,10 +8,6 @@
 
 #include "cam_cpas_api.h"
 #include "cam_cpas_hw.h"
-
-/* Camera Hw parts array indices */
-#define CAM_CPAS_PART_MAX_FUSE_BITS 8
-#define CAM_CPAS_PART_MAX_FUSE_BIT_INFO 2
 
 /**
  * enum cam_camnoc_hw_irq_type - Enum for camnoc error types
@@ -193,19 +188,10 @@ enum cam_camnoc_port_type {
 	CAM_CAMNOC_JPEG,
 	CAM_CAMNOC_FD,
 	CAM_CAMNOC_ICP,
-	CAM_CAMNOC_TFE_BAYER_STATS,
-	CAM_CAMNOC_TFE_BAYER_STATS_1,
-	CAM_CAMNOC_TFE_BAYER_STATS_2,
-	CAM_CAMNOC_TFE_RAW,
-	CAM_CAMNOC_TFE_RAW_1,
-	CAM_CAMNOC_TFE_RAW_2,
 	CAM_CAMNOC_TFE,
 	CAM_CAMNOC_TFE_1,
 	CAM_CAMNOC_TFE_2,
 	CAM_CAMNOC_OPE,
-	CAM_CAMNOC_OPE_BPS_WR,
-	CAM_CAMNOC_OPE_BPS_CDM_RD,
-	CAM_CAMNOC_CRE,
 	CAM_CAMNOC_IFE01234_RDI_WRITE,
 	CAM_CAMNOC_IFE01_NRDI_WRITE,
 	CAM_CAMNOC_IFE2_NRDI_WRITE,
@@ -294,18 +280,6 @@ struct cam_cpas_hw_errata_wa {
 	union {
 		struct cam_cpas_reg reg_info;
 	} data;
-};
-
-/**
- * struct cam_cpas_subpart_info : Struct for camera Hw parts info
- *
- * @num_bits: Number of entries in hw_bitmap_mask
- * @hw_bitmap_mask: Contains Fuse flag and hw_map info
- *
- */
-struct cam_cpas_subpart_info {
-	uint32_t num_bits;
-	uint32_t hw_bitmap_mask[CAM_CPAS_PART_MAX_FUSE_BITS][CAM_CPAS_PART_MAX_FUSE_BIT_INFO];
 };
 
 /**
@@ -399,20 +373,6 @@ struct cam_cpas_work_payload {
 struct cam_cpas_camnoc_qchannel {
 	uint32_t qchannel_ctrl;
 	uint32_t qchannel_status;
-};
-
-
-/**
- * struct cam_cpas_top_regs : CPAS Top registers
- * @tpg_mux_sel_shift:     TPG mux select shift value
- * @tpg_mux_sel:           For selecting TPG
- * @tpg_mux_sel_enabled:   TPG mux select enabled or not
- *
- */
-struct cam_cpas_top_regs {
-	uint32_t tpg_mux_sel_shift;
-	uint32_t tpg_mux_sel;
-	bool     tpg_mux_sel_enabled;
 };
 
 #endif /* _CAM_CPASTOP_HW_H_ */

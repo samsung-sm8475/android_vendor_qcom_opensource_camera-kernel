@@ -12,7 +12,7 @@
 
 #define CAM_IFE_CSID_VER_1_0  0x100
 #define CAM_IFE_CSID_VER_2_0  0x200
-#define CAM_IFE_CSID_MAX_ERR_COUNT  100
+#define CAM_IFE_CSID_MAX_ERR_COUNT  1
 
 #define CAM_IFE_CSID_HW_CAP_IPP                           0x1
 #define CAM_IFE_CSID_HW_CAP_RDI                           0x2
@@ -32,16 +32,6 @@
 #define CAM_IFE_CSID_HW_IDX_2                             0x4
 
 #define CAM_IFE_CSID_LOG_BUF_LEN                          512
-
-#define CAM_IFE_CSID_CAP_INPUT_LCR                        0x1
-#define CAM_IFE_CSID_CAP_MIPI8_UNPACK                     0x2
-#define CAM_IFE_CSID_CAP_MIPI10_UNPACK                    0x4
-#define CAM_IFE_CSID_CAP_MIPI12_UNPACK                    0x8
-#define CAM_IFE_CSID_CAP_MIPI14_UNPACK                    0x10
-#define CAM_IFE_CSID_CAP_MIPI16_UNPACK                    0x20
-#define CAM_IFE_CSID_CAP_MIPI20_UNPACK                    0x40
-#define CAM_IFE_CSID_CAP_LINE_SMOOTHING_IN_RDI            0x80
-#define CAM_IFE_CSID_CAP_SOF_RETIME_DIS                   0x100
 
 /*
  * Debug values enable the corresponding interrupts and debug logs provide
@@ -104,25 +94,25 @@ enum cam_ife_csid_irq_reg {
 /*
  * struct cam_ife_csid_irq_desc: Structure to hold IRQ description
  *
- * @bitmask    :     Bitmask of the IRQ
+ * @bitmask  :       Bitmask of the IRQ
  * @err_type   :     Error type for ISP hardware event
- * @irq_desc   :     String to describe the IRQ bit
+ * @irq_desc:        String to describe the IRQ bit
  * @err_handler:     Error handler which gets invoked if error IRQ bit set
  */
 struct cam_ife_csid_irq_desc {
 	uint32_t    bitmask;
 	uint32_t    err_type;
 	uint8_t    *desc;
-	void       (*err_handler)(void *csid_hw, void *res);
+	void       (*err_handler)(void* csid_hw, void* res);
 };
 
 /*
  * struct cam_ife_csid_top_irq_desc: Structure to hold IRQ bitmask and description
  *
- * @bitmask    :        Bitmask of the IRQ
+ * @bitmask  :        Bitmask of the IRQ
  * @err_type   :        Error type for ISP hardware event
- * @err_name   :        IRQ name
- * @desc       :        String to describe about the IRQ
+ * @err_name :        IRQ name
+ * @desc     :        String to describe about the IRQ
  * @err_handler:        Error handler which gets invoked if error IRQ bit set
  */
 struct cam_ife_csid_top_irq_desc {
@@ -130,7 +120,7 @@ struct cam_ife_csid_top_irq_desc {
 	uint32_t    err_type;
 	char       *err_name;
 	char       *desc;
-	void       (*err_handler)(void *csid_hw);
+	void       (*err_handler)(void* csid_hw);
 };
 
 /*
@@ -237,6 +227,7 @@ struct cam_ife_csid_csi2_rx_reg_info {
 	uint32_t fatal_err_mask;
 	uint32_t part_fatal_err_mask;
 	uint32_t non_fatal_err_mask;
+	uint32_t phy_recovery_mask;
 	uint32_t debug_irq_mask;
 	uint32_t top_irq_mask;
 };
@@ -279,14 +270,18 @@ struct cam_ife_csid_hw_counters {
 /*
  * struct cam_ife_csid_debug_info: place holder for csid debug
  *
- * @debug_val:          Debug val for enabled features
- * @rx_mask:            Debug mask for rx irq
- * @path_mask:          Debug mask for path irq
+ * @debug_val:             Debug val for enabled features
+ * @rx_capture_debug:      rx packet capture debug
+ * @rx_mask:               Debug mask for rx irq
+ * @path_mask:             Debug mask for path irq
+ * @rx_capture_debug_set:  rx pkt capture debug set
  */
 struct cam_ife_csid_debug_info {
 	uint32_t                          debug_val;
+	uint32_t                          rx_capture_debug;
 	uint32_t                          rx_mask;
 	uint32_t                          path_mask;
+	bool                              rx_capture_debug_set;
 };
 
 /*
@@ -300,8 +295,6 @@ struct cam_ife_csid_debug_info {
  * @tpg_configured:         flag to indicate if internal_tpg is configured
  * @reset_awaited:          flag to indicate if reset is awaited
  * @offline_mode:           flag to indicate if csid in offline mode
- * @rdi_lcr_en:             flag to indicate if RDI to lcr is enabled
- * @sfe_en:                 flag to indicate if SFE is enabled
  */
 struct cam_ife_csid_hw_flags {
 	bool                  device_enabled;
@@ -314,12 +307,10 @@ struct cam_ife_csid_hw_flags {
 	bool                  tpg_configured;
 	bool                  reset_awaited;
 	bool                  offline_mode;
-	bool                  rdi_lcr_en;
-	bool                  sfe_en;
 };
 
 /*
- * struct am_ife_csid_cid_data: place holder for cid data
+ * struct cam_ife_csid_hw_flags: place holder for flags
  *
  * @vc_dt:        vc_dt structure
  * @cid_cnt:      count of cid acquired
@@ -332,7 +323,7 @@ struct cam_ife_csid_cid_data {
 };
 
 /*
- * struct cam_ife_csid_rx_cfg: place holder for rx cfg
+ * struct cam_ife_csid_hw_flags: place holder for flags
  *
  * @phy_sel:                  Selected phy
  * @lane_type:                type of lane selected
@@ -365,8 +356,7 @@ int cam_ife_csid_is_pix_res_format_supported(
 
 int cam_ife_csid_get_format_rdi(
 	uint32_t in_format, uint32_t out_format,
-	struct cam_ife_csid_path_format *path_format, bool mipi_pack_supported,
-	bool mipi_unpacked);
+	struct cam_ife_csid_path_format *path_format, bool rpp);
 
 int cam_ife_csid_get_format_ipp_ppp(
 	uint32_t in_format,

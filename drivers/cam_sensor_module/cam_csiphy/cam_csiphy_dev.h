@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CSIPHY_DEV_H_
@@ -35,7 +34,7 @@
 
 #define MAX_LANES                   5
 #define MAX_SETTINGS_PER_LANE       50
-#define MAX_DATA_RATES              26
+#define MAX_DATA_RATES              25
 #define MAX_DATA_RATE_REGS          30
 
 #define CAMX_CSIPHY_DEV_NAME "cam-csiphy-driver"
@@ -52,7 +51,7 @@
 #define CSIPHY_2PH_COMBO_REGS            8
 #define CSIPHY_3PH_COMBO_REGS            9
 #define CSIPHY_2PH_3PH_COMBO_REGS        10
-#define CSIPHY_AUXILIARY_SETTING         11
+#define CSIPHY_AUXILLARY_SETTING         11
 
 #define CSIPHY_MAX_INSTANCES_PER_PHY     3
 
@@ -68,11 +67,6 @@
 #define CPHY_LANE_2    BIT(5)
 #define DPHY_LANE_3    BIT(6)
 #define DPHY_CLK_LN    BIT(7)
-
-/* PRBS Pattern Macros */
-#define PREAMBLE_PATTERN_SET_CHECKER    BIT(4)
-#define PREAMBLE_PATTERN_BIST_DONE      BIT(0)
-#define PREAMBLE_MAX_ERR_COUNT_ALLOWED  2
 
 enum cam_csiphy_state {
 	CAM_CSIPHY_INIT,
@@ -214,31 +208,20 @@ struct data_rate_reg_info_t {
  *                           present in the data rate settings array
  * @data_rate_settings    : Array of regsettings which are specific to
  *                           data rate
- * @min_supported_datarate: Minimum Supported Data Rate on PHY
- * @max_supported_datarate: Maximum Supported Data Rate on PHY
  */
 struct data_rate_settings_t {
 	ssize_t num_data_rate_settings;
 	struct data_rate_reg_info_t data_rate_settings[MAX_DATA_RATES];
-	uint64_t min_supported_datarate;
-	uint64_t max_supported_datarate;
 };
 
 struct bist_reg_settings_t {
-	uint32_t error_status_val_3ph;
-	uint32_t error_status_val_2ph;
-	uint32_t set_status_update_3ph_base_offset;
-	uint32_t set_status_update_2ph_base_offset;
-	uint32_t bist_status_3ph_base_offset;
-	uint32_t bist_status_2ph_base_offset;
-	uint32_t bist_sensor_data_3ph_status_base_offset;
-	uint32_t bist_counter_3ph_base_offset;
-	uint32_t bist_counter_2ph_base_offset;
-	uint32_t number_of_counters;
-	ssize_t num_status_reg;
+	uint32_t expected_status_val;
 	ssize_t num_data_settings;
+	ssize_t num_status_reg;
+	ssize_t num_status_err_check_reg;
 	struct csiphy_reg_t *bist_arry;
 	struct csiphy_reg_t *bist_status_arr;
+	struct csiphy_reg_t *bist_status_err_check_arr;
 };
 
 /**
@@ -320,7 +303,6 @@ struct csiphy_work_queue {
  * @cphy_dphy_combo_mode       : Info regarding 2ph/3ph combo modes
  * @rx_clk_src_idx             : Phy src clk index
  * @is_divisor_32_comp         : 32 bit hw compatibility
- * @curr_data_rate_idx         : Index of the datarate array which is being used currently by phy
  * @csiphy_state               : CSIPhy state
  * @ctrl_reg                   : CSIPhy control registers
  * @csiphy_3p_clk_info         : 3Phase clock information
@@ -337,8 +319,8 @@ struct csiphy_work_queue {
  * @en_common_status_reg_dump  : Debugfs flag to enable common status register dump
  * @en_lane_status_reg_dump    : Debugfs flag to enable cphy/dphy lane status dump
  * @en_full_phy_reg_dump       : Debugfs flag to enable the dump for all the Phy registers
- * @skip_aux_settings          : Debugfs flag to ignore calls to update aux settings
  * @preamble_enable            : To enable preamble pattern
+ * @work_queue                 : Work queue to offload the work
  */
 struct csiphy_device {
 	char                           device_name[CAM_CTX_DEV_NAME_MAX_LENGTH];
@@ -354,7 +336,7 @@ struct csiphy_device {
 	uint8_t                        cphy_dphy_combo_mode;
 	uint8_t                        rx_clk_src_idx;
 	uint8_t                        is_divisor_32_comp;
-	uint8_t                        curr_data_rate_idx;
+	uint32_t                       curr_data_rate_idx;
 	enum cam_csiphy_state          csiphy_state;
 	struct csiphy_ctrl_t          *ctrl_reg;
 	struct msm_cam_clk_info        csiphy_3p_clk_info[2];
@@ -373,8 +355,8 @@ struct csiphy_device {
 	bool                           en_common_status_reg_dump;
 	bool                           en_lane_status_reg_dump;
 	bool                           en_full_phy_reg_dump;
-	bool                           skip_aux_settings;
 	uint16_t                       preamble_enable;
+	struct workqueue_struct       *work_queue;
 };
 
 /**

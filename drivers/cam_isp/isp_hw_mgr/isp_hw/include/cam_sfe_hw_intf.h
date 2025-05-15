@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_SFE_HW_INTF_H_
@@ -12,6 +11,7 @@
 #include "cam_cpas_api.h"
 
 #define SFE_CORE_BASE_IDX           0
+#define SFE_RT_CDM_BASE_IDX         1
 #define CAM_SFE_HW_NUM_MAX          2
 
 enum cam_sfe_core_id {
@@ -199,7 +199,6 @@ struct cam_sfe_top_irq_evt_payload {
  * @error_type:              Identify different errors
  * @evt_id:                  IRQ event
  * @ts:                      Timestamp
- * @last_consumed_addr:      Last consumed addr for resource
  */
 struct cam_sfe_bus_wr_irq_evt_payload {
 	struct list_head           list;
@@ -211,7 +210,6 @@ struct cam_sfe_bus_wr_irq_evt_payload {
 	uint32_t                   error_type;
 	uint32_t                   evt_id;
 	struct cam_isp_timestamp   ts;
-	uint32_t                   last_consumed_addr;
 };
 
 /*
@@ -309,8 +307,6 @@ struct cam_sfe_hw_sfe_in_acquire_args {
  * @split_id:                In case of Dual SFE, this is Left or Right.
  * @is_master:               In case of Dual SFE, this is Master or Slave.
  * @cdm_ops:                 CDM operations
- * @use_wm_pack:             Flag to indicalte packing at WM side
- * @comp_grp_id:             SFE bus comp group id
  */
 struct cam_sfe_hw_sfe_out_acquire_args {
 	struct cam_isp_resource_node         *rsrc_node;
@@ -320,8 +316,6 @@ struct cam_sfe_hw_sfe_out_acquire_args {
 	enum cam_isp_hw_split_id              split_id;
 	uint32_t                              is_master;
 	struct cam_cdm_utils_ops             *cdm_ops;
-	bool                                  use_wm_pack;
-	uint32_t                              comp_grp_id;
 };
 
 /*
@@ -350,15 +344,6 @@ struct cam_sfe_acquire_args {
 		struct cam_sfe_hw_sfe_bus_rd_acquire_args  sfe_rd;
 	};
 };
-
-/*
- * cam_sfe_get_num_hws()
- *
- * @brief : Populates number of SFEs.
- *
- * @num_sfes : Fills number of SFEs in the address passed.
- */
-void cam_sfe_get_num_hws(uint32_t *num_sfes);
 
 /*
  * cam_sfe_hw_init()

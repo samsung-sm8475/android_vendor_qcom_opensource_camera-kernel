@@ -7,15 +7,11 @@ DLKM_DIR := $(TOP)/device/qcom/common/dlkm
 
 # Kbuild options
 KBUILD_OPTIONS := CAMERA_KERNEL_ROOT=$(shell pwd)/$(LOCAL_PATH)
-KBUILD_OPTIONS += KERNEL_ROOT=$(shell pwd)/kernel/msm-$(TARGET_KERNEL_VERSION)/
+KBUILD_OPTIONS += KERNEL_ROOT=$(srctree)/
 KBUILD_OPTIONS += MODNAME=camera
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 
 ifeq ($(TARGET_BOARD_PLATFORM), taro)
-	KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(shell pwd)/$(call intermediates-dir-for,DLKM,mmrm-module-symvers)/Module.symvers
-endif
-
-ifeq ($(TARGET_BOARD_PLATFORM), parrot)
 	KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(shell pwd)/$(call intermediates-dir-for,DLKM,mmrm-module-symvers)/Module.symvers
 endif
 
@@ -38,11 +34,6 @@ LOCAL_MODULE_TAGS           := optional
 #LOCAL_MODULE_DEBUG_ENABLE  := true
 
 ifeq ($(TARGET_BOARD_PLATFORM), taro)
-	LOCAL_REQUIRED_MODULES        := mmrm-module-symvers
-	LOCAL_ADDITIONAL_DEPENDENCIES := $(call intermediates-dir-for,DLKM,mmrm-module-symvers)/Module.symvers
-endif
-
-ifeq ($(TARGET_BOARD_PLATFORM), parrot)
 	LOCAL_REQUIRED_MODULES        := mmrm-module-symvers
 	LOCAL_ADDITIONAL_DEPENDENCIES := $(call intermediates-dir-for,DLKM,mmrm-module-symvers)/Module.symvers
 endif

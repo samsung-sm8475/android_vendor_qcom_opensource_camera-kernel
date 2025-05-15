@@ -33,6 +33,53 @@
 #define QTIMER_MUL_FACTOR   10000
 #define QTIMER_DIV_FACTOR   192
 
+#define SENSOR_ID_HI847_HI1337 0x2000  // HI847 and HI1337 have same sensor id.
+
+#if defined(CONFIG_CAMERA_ADAPTIVE_MIPI)
+#define SENSOR_ID_S5KGN3 0x08E3
+#define SENSOR_ID_S5KHM3 0x1AD3
+#define SENSOR_ID_IMX374 0x0374
+#define SENSOR_ID_S5KGH1 0x0881
+#define SENSOR_ID_IMX563 0x0563
+#define SENSOR_ID_S5K3K1 0x30B1
+#define SENSOR_ID_IMX754 0x0754
+#define SENSOR_ID_IMX258 0x0258
+#define FRONT_SENSOR_ID_IMX471 0x0471
+#define FRONT_SENSOR_ID_IMX374 0x0374
+#define SENSOR_ID_S5K2LD 0x20CD
+#define SENSOR_ID_S5K3J1 0x30A1
+
+#define INVALID_MIPI_INDEX -1
+#endif
+
+#if defined(CONFIG_SENSOR_RETENTION)
+#define SENSOR_RETENTION_READ_RETRY_CNT 2
+
+#if defined(CONFIG_SEC_R0Q_PROJECT) || defined(CONFIG_SEC_G0Q_PROJECT) || defined(CONFIG_SEC_Q4Q_PROJECT)
+#define RETENTION_SENSOR_ID 0x08E3
+#elif defined(CONFIG_SEC_B0Q_PROJECT)
+#define RETENTION_SENSOR_ID 0x1AD3
+#elif defined(CONFIG_SEC_B4Q_PROJECT)
+#define RETENTION_SENSOR_ID 0x20CD
+#endif
+
+#define STREAM_ON_ADDR   0x100
+
+enum sensor_retention_mode {
+	RETENTION_INIT = 0,
+	RETENTION_READY_TO_ON,
+	RETENTION_ON,
+};
+#endif
+
+#if defined(CONFIG_CAMERA_AEB_OFF_CONTROL)
+#if defined(CONFIG_SEC_B0Q_PROJECT)
+#define AEB_SENSOR_ID 0x1AD3
+#else
+#define AEB_SENSOR_ID 0
+#endif
+#endif // defined(CONFIG_CAMERA_AEB_OFF_CONTROL)
+
 int cam_get_dt_power_setting_data(struct device_node *of_node,
 	struct cam_hw_soc_info *soc_info,
 	struct cam_sensor_power_ctrl_t *power_info);

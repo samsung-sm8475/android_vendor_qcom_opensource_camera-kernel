@@ -13,6 +13,7 @@
 
 static struct v4l2_subdev *g_cci_subdev[MAX_CCI] = { 0 };
 static struct dentry *debugfs_root;
+struct device *is_dev = NULL;
 
 struct v4l2_subdev *cam_cci_get_subdev(int cci_dev_index)
 {
@@ -105,6 +106,7 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 	} else if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_RD_DONE_BMSK ||
 		irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_RD_DONE_BMSK) {
 		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M0_RD_DONE_BMSK) {
+			CAM_INFO(CAM_CCI,"##### irq_status0 stauts:0x%x, m0 rd done:0x%x",irq_status0,CCI_IRQ_STATUS_0_I2C_M0_RD_DONE_BMSK);
 			spin_lock_irqsave(&cci_dev->lock_status, flags);
 			if (cci_dev->irqs_disabled &
 				CCI_IRQ_STATUS_1_I2C_M0_RD_THRESHOLD) {
@@ -116,6 +118,7 @@ irqreturn_t cam_cci_irq(int irq_num, void *data)
 			spin_unlock_irqrestore(&cci_dev->lock_status, flags);
 		}
 		if (irq_status0 & CCI_IRQ_STATUS_0_I2C_M1_RD_DONE_BMSK) {
+			CAM_INFO(CAM_CCI,"##### irq_status0 stauts:0x%x, m1 rd done:0x%x",irq_status0,CCI_IRQ_STATUS_0_I2C_M1_RD_DONE_BMSK);
 			spin_lock_irqsave(&cci_dev->lock_status, flags);
 			if (cci_dev->irqs_disabled &
 				CCI_IRQ_STATUS_1_I2C_M1_RD_THRESHOLD) {
@@ -570,6 +573,8 @@ static int cam_cci_platform_probe(struct platform_device *pdev)
 	rc = component_add(&pdev->dev, &cam_cci_component_ops);
 	if (rc)
 		CAM_ERR(CAM_CCI, "failed to add component rc: %d", rc);
+
+	is_dev = &pdev->dev;
 
 	return rc;
 }

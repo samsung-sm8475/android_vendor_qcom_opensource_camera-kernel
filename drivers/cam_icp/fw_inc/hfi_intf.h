@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _HFI_INTF_H_
@@ -143,12 +142,6 @@ int hfi_set_debug_level(u64 icp_dbg_type, uint32_t lvl);
 int hfi_set_fw_dump_level(uint32_t lvl);
 
 /**
- * hfi_send_freq_info() - set firmware dump level
- * @freq: icp freq
- */
-int hfi_send_freq_info(int32_t freq);
-
-/**
  * hfi_enable_ipe_bps_pc() - Enable interframe pc
  * Host sends a command to firmware to enable interframe
  * power collapse for IPE and BPS hardware.
@@ -183,14 +176,14 @@ int cam_hfi_resume(struct hfi_mem_info *hfi_mem);
 
 /**
  * cam_hfi_queue_dump() - utility function to dump hfi queues
- * @dump_queue_data: if set dumps queue contents
- *
  */
-void cam_hfi_queue_dump(bool dump_queue_data);
+void cam_hfi_queue_dump(void);
 
 /**
  * cam_hfi_mini_dump() - utility function for mini dump
  */
 void cam_hfi_mini_dump(struct hfi_mini_dump_info *dst);
+
+void cam_hfi_dump_response_registers(void);
 
 #endif /* _HFI_INTF_H_ */

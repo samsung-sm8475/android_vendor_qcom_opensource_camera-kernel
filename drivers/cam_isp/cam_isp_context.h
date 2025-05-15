@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_ISP_CONTEXT_H_
@@ -51,16 +50,19 @@
 #define CAM_ISP_CTX_DUMP_REQUEST_NUM_WORDS  2
 
 /* Maximum entries in event record */
-#define CAM_ISP_CTX_EVENT_RECORD_MAX_ENTRIES   8
+#define CAM_ISP_CTX_EVENT_RECORD_MAX_ENTRIES   20
 
 /* Maximum length of tag while dumping */
-#define CAM_ISP_CONTEXT_DUMP_TAG_MAX_LEN 64
+#define CAM_ISP_CONTEXT_DUMP_TAG_MAX_LEN 32
+
+/* Maximum entries in frame record */
+#define CAM_ISP_CTX_MAX_FRAME_RECORDS  3
 
 /* AEB error count threshold */
 #define CAM_ISP_CONTEXT_AEB_ERROR_CNT_MAX 3
 
-/* Debug Buffer length*/
-#define CAM_ISP_CONTEXT_DBG_BUF_LEN 300
+/* MUP out of sync threshold */
+#define CAM_ISP_CONTEXT_OUT_OF_SYNC_ERROR_MAX 10
 
 /* forward declaration */
 struct cam_isp_context;
@@ -238,6 +240,61 @@ struct cam_isp_context_event_record {
 	ktime_t                          timestamp;
 };
 
+
+/**
+ *
+ *
+ * struct cam_isp_context_frame_timing_record - Frame timing events
+ *
+ * @sof_ts:           SOF timestamp
+ * @eof_ts:           EOF ts
+ * @epoch_ts:         EPOCH ts
+ * @secondary_sof_ts: Secondary SOF ts
+ *
+ */
+struct cam_isp_context_frame_timing_record {
+	struct timespec64 sof_ts;
+	struct timespec64 eof_ts;
+	struct timespec64 epoch_ts;
+	struct timespec64 secondary_sof_ts;
+};
+
+
+/**
+ *
+ *
+ * struct cam_isp_context_debug_monitors - ISP context debug monitors
+ *
+ * @state_monitor_head:        State machine monitor head
+ * @cam_isp_ctx_state_monitor: State machine monitor info
+ * @event_record_head:         Request Event monitor head
+ * @event_record:              Request event monitor info
+ * @frame_monitor_head:        Frame timing monitor head
+ * @frame_monitor:             Frame timing event monitor
+ *
+ */
+struct cam_isp_context_debug_monitors {
+	/* State machine monitoring */
+	atomic64_t                           state_monitor_head;
+	struct cam_isp_context_state_monitor cam_isp_ctx_state_monitor[
+		CAM_ISP_CTX_STATE_MONITOR_MAX_ENTRIES];
+
+	/* Req event monitor */
+	atomic64_t                            event_record_head[
+		CAM_ISP_CTX_EVENT_MAX];
+	struct cam_isp_context_event_record   event_record[
+		CAM_ISP_CTX_EVENT_MAX][CAM_ISP_CTX_EVENT_RECORD_MAX_ENTRIES];
+
+	/* Frame timing monitor */
+	atomic64_t                            frame_monitor_head;
+	struct cam_isp_context_frame_timing_record frame_monitor[
+		CAM_ISP_CTX_MAX_FRAME_RECORDS];
+	uint64_t min_delta;
+	uint64_t max_delta;
+};
+
+
+
 /**
  * struct cam_isp_context   -  ISP context object
  *
@@ -265,11 +322,8 @@ struct cam_isp_context_event_record {
  * @bubble_frame_cnt:          Count of the frame after bubble
  * @aeb_error_cnt:             Count number of times a specific AEB error scenario is
  *                             enountered
- * @state_monitor_head:        Write index to the state monitoring array
  * @req_info                   Request id information about last buf done
- * @cam_isp_ctx_state_monitor: State monitoring array
- * @event_record_head:         Write index to the state monitoring array
- * @event_record:              Event record array
+ * @dbg_monitors:              Debug monitors for ISP context
  * @rdi_only_context:          Get context type information.
  *                             true, if context is rdi only context
  * @offline_context:           Indicate whether context is for offline IFE
@@ -289,16 +343,14 @@ struct cam_isp_context_event_record {
  * @trigger_id:                ID provided by CRM for each ctx on the link
  * @last_bufdone_err_apply_req_id:  last bufdone error apply request id
  * @v4l2_event_sub_ids         contains individual bits representing subscribed v4l2 ids
- * @aeb_enabled:               Indicate if stream is for AEB
- * @do_internal_recovery:      Enable KMD halt/reset/resume internal recovery
- * @vfe_bus_comp_grp:          Vfe bus comp group record
- * @sfe_bus_comp_grp:          Sfe bus comp group record
+ * @aeb_enabled:				 Indicate if stream is for AEB
+ * @do_internal_recovery: 	 Enable KMD halt/reset/resume internal recovery
  *
  */
 struct cam_isp_context {
 	struct cam_context              *base;
 
-	uint64_t                         frame_id;
+	uint64_t                          frame_id;
 	uint32_t                         frame_id_meta;
 	uint32_t                         substate_activated;
 	atomic_t                         process_bubble;
@@ -320,14 +372,9 @@ struct cam_isp_context {
 	uint64_t                         last_sof_timestamp;
 	uint32_t                         bubble_frame_cnt;
 	uint32_t                         aeb_error_cnt;
-	atomic64_t                       state_monitor_head;
-	struct cam_isp_context_state_monitor cam_isp_ctx_state_monitor[
-		CAM_ISP_CTX_STATE_MONITOR_MAX_ENTRIES];
+	uint32_t                         out_of_sync_cnt;
 	struct cam_isp_context_req_id_info    req_info;
-	atomic64_t                            event_record_head[
-		CAM_ISP_CTX_EVENT_MAX];
-	struct cam_isp_context_event_record   event_record[
-		CAM_ISP_CTX_EVENT_MAX][CAM_ISP_CTX_EVENT_RECORD_MAX_ENTRIES];
+	struct cam_isp_context_debug_monitors dbg_monitors;
 	bool                                  rdi_only_context;
 	bool                                  offline_context;
 	bool                                  hw_acquired;
@@ -348,8 +395,6 @@ struct cam_isp_context {
 	uint32_t                              v4l2_event_sub_ids;
 	bool                                  aeb_enabled;
 	bool                                  do_internal_recovery;
-	struct cam_isp_hw_comp_record        *vfe_bus_comp_grp;
-	struct cam_isp_hw_comp_record        *sfe_bus_comp_grp;
 };
 
 /**

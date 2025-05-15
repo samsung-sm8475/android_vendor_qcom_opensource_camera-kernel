@@ -83,11 +83,13 @@ int32_t cam_eeprom_update_i2c_info(struct cam_eeprom_ctrl_t *e_ctrl,
 			return -EINVAL;
 		}
 		cci_client->cci_i2c_master = e_ctrl->cci_i2c_master;
+		if (i2c_info->slave_addr > 0)
 		cci_client->sid = (i2c_info->slave_addr) >> 1;
 		cci_client->retries = 3;
 		cci_client->id_map = 0;
 		cci_client->i2c_freq_mode = i2c_info->i2c_freq_mode;
 	} else if (e_ctrl->io_master_info.master_type == I2C_MASTER) {
+		if (i2c_info->slave_addr > 0)
 		e_ctrl->io_master_info.client->addr = i2c_info->slave_addr;
 		CAM_DBG(CAM_EEPROM, "Slave addr: 0x%x", i2c_info->slave_addr);
 	} else if (e_ctrl->io_master_info.master_type == SPI_MASTER) {
@@ -171,26 +173,23 @@ static int cam_eeprom_init_subdev(struct cam_eeprom_ctrl_t *e_ctrl)
 	e_ctrl->v4l2_dev_str.close_seq_prior = CAM_SD_CLOSE_MEDIUM_PRIORITY;
 
 	rc = cam_register_subdev(&(e_ctrl->v4l2_dev_str));
-	if (rc)
+	if ((rc < 0) && (rc != -EPROBE_DEFER))
 		CAM_ERR(CAM_SENSOR, "Fail with cam_register_subdev");
 
 	return rc;
 }
 
-static int cam_eeprom_i2c_component_bind(struct device *dev,
-	struct device *master_dev, void *data)
+static int cam_eeprom_i2c_driver_probe(struct i2c_client *client,
+	 const struct i2c_device_id *id)
 {
 	int                             rc = 0;
-	struct i2c_client              *client = NULL;
 	struct cam_eeprom_ctrl_t       *e_ctrl = NULL;
 	struct cam_eeprom_soc_private  *soc_private = NULL;
 	struct cam_hw_soc_info         *soc_info = NULL;
 
-	client = container_of(dev, struct i2c_client, dev);
-	if (client == NULL) {
-		CAM_ERR(CAM_OIS, "Invalid Args client: %pK",
-			client);
-		return -EINVAL;
+	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+		CAM_ERR(CAM_EEPROM, "i2c_check_functionality failed");
+		goto probe_failure;
 	}
 
 	e_ctrl = kzalloc(sizeof(*e_ctrl), GFP_KERNEL);
@@ -256,40 +255,30 @@ probe_failure:
 	return rc;
 }
 
-static void cam_eeprom_i2c_component_unbind(struct device *dev,
-	struct device *master_dev, void *data)
+static int cam_eeprom_i2c_driver_remove(struct i2c_client *client)
 {
 	int                             i;
-	struct i2c_client              *client = NULL;
 	struct v4l2_subdev             *sd = i2c_get_clientdata(client);
 	struct cam_eeprom_ctrl_t       *e_ctrl;
 	struct cam_eeprom_soc_private  *soc_private;
 	struct cam_hw_soc_info         *soc_info;
 
-	client = container_of(dev, struct i2c_client, dev);
-	if (!client) {
-		CAM_ERR(CAM_EEPROM,
-			"Failed to get i2c client");
-		return;
-	}
-
-	sd = i2c_get_clientdata(client);
 	if (!sd) {
 		CAM_ERR(CAM_EEPROM, "Subdevice is NULL");
-		return;
+		return -EINVAL;
 	}
 
 	e_ctrl = (struct cam_eeprom_ctrl_t *)v4l2_get_subdevdata(sd);
 	if (!e_ctrl) {
 		CAM_ERR(CAM_EEPROM, "eeprom device is NULL");
-		return;
+		return -EINVAL;
 	}
 
 	soc_private =
 		(struct cam_eeprom_soc_private *)e_ctrl->soc_info.soc_private;
 	if (!soc_private) {
 		CAM_ERR(CAM_EEPROM, "soc_info.soc_private is NULL");
-		return;
+		return -EINVAL;
 	}
 
 	CAM_INFO(CAM_EEPROM, "i2c driver remove invoked");
@@ -305,41 +294,6 @@ static void cam_eeprom_i2c_component_unbind(struct device *dev,
 	kfree(soc_private);
 	v4l2_set_subdevdata(&e_ctrl->v4l2_dev_str.sd, NULL);
 	kfree(e_ctrl);
-}
-
-const static struct component_ops cam_eeprom_i2c_component_ops = {
-	.bind = cam_eeprom_i2c_component_bind,
-	.unbind = cam_eeprom_i2c_component_unbind,
-};
-
-static int cam_eeprom_i2c_driver_probe(struct i2c_client *client,
-	const struct i2c_device_id *id)
-{
-	int rc = 0;
-
-	if (client == NULL || id == NULL) {
-		CAM_ERR(CAM_EEPROM, "Invalid Args client: %pK id: %pK",
-			client, id);
-		return -EINVAL;
-	}
-
-	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		CAM_ERR(CAM_EEPROM, "%s :: i2c_check_functionality failed",
-			client->name);
-		return -EFAULT;
-	}
-
-	CAM_DBG(CAM_EEPROM, "Adding sensor eeprom component");
-	rc = component_add(&client->dev, &cam_eeprom_i2c_component_ops);
-	if (rc)
-		CAM_ERR(CAM_EEPROM, "failed to add component rc: %d", rc);
-
-	return rc;
-}
-
-static int cam_eeprom_i2c_driver_remove(struct i2c_client *client)
-{
-	component_del(&client->dev, &cam_eeprom_i2c_component_ops);
 
 	return 0;
 }
@@ -633,25 +587,18 @@ struct platform_driver cam_eeprom_platform_driver = {
 };
 
 static const struct i2c_device_id cam_eeprom_i2c_id[] = {
-	{ EEPROM_DRIVER_I2C, (kernel_ulong_t)NULL},
+	{ "msm_eeprom", (kernel_ulong_t)NULL},
 	{ }
 };
 
-static const struct of_device_id cam_eeprom_i2c_dt_match[] = {
-	{ .compatible = "qcom,cam-i2c-eeprom" },
-	{ }
-};
-
-MODULE_DEVICE_TABLE(of, cam_eeprom_i2c_dt_match);
-
-struct i2c_driver cam_eeprom_i2c_driver = {
+static struct i2c_driver cam_eeprom_i2c_driver = {
 	.id_table = cam_eeprom_i2c_id,
 	.probe  = cam_eeprom_i2c_driver_probe,
 	.remove = cam_eeprom_i2c_driver_remove,
 	.driver = {
-		.name = EEPROM_DRIVER_I2C,
+		.name = "msm_eeprom",
 		.owner = THIS_MODULE,
-		.of_match_table = cam_eeprom_i2c_dt_match,
+		.of_match_table = cam_eeprom_dt_match,
 		.suppress_bind_attrs = true,
 	},
 };

@@ -322,7 +322,7 @@ int cam_sfe_process_cmd(void *hw_priv, uint32_t cmd_type,
 	case CAM_ISP_HW_CMD_BW_UPDATE_V2:
 	case CAM_ISP_HW_CMD_BW_CONTROL:
 	case CAM_ISP_HW_CMD_CORE_CONFIG:
-	case CAM_ISP_HW_NOTIFY_OVERFLOW:
+	case CAM_ISP_HW_DUMP_REG_ON_ERROR:
 	case CAM_ISP_HW_CMD_APPLY_CLK_BW_UPDATE:
 		rc = core_info->sfe_top->hw_ops.process_cmd(
 			core_info->sfe_top->top_priv, cmd_type,
@@ -337,7 +337,7 @@ int cam_sfe_process_cmd(void *hw_priv, uint32_t cmd_type,
 	case CAM_ISP_HW_CMD_QUERY_BUS_CAP:
 	case CAM_ISP_HW_SFE_SYS_CACHE_WM_CONFIG:
 	case CAM_ISP_HW_CMD_WM_BW_LIMIT_CONFIG:
-	case CAM_ISP_HW_USER_DUMP:
+	case CAM_ISP_HW_CMD_DUMP_BUS_INFO:
 		rc = core_info->sfe_bus_wr->hw_ops.process_cmd(
 			core_info->sfe_bus_wr->bus_priv, cmd_type,
 			cmd_args, arg_size);

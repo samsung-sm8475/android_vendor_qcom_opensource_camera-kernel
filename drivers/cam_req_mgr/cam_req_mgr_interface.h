@@ -23,6 +23,8 @@ struct cam_req_mgr_flush_request;
 struct cam_req_mgr_link_evt_data;
 struct cam_req_mgr_dump_info;
 
+#define SKIP_NEXT_FRAME 0x100
+
 /* Request Manager -- camera device driver interface */
 /**
  * @brief: camera kernel drivers to cam req mgr communication
@@ -283,6 +285,7 @@ struct cam_req_mgr_add_request {
 	int32_t  link_hdl;
 	int32_t  dev_hdl;
 	uint64_t req_id;
+	uint32_t skip_before_applying;
 	uint32_t skip_at_sof;
 	uint32_t skip_at_eof;
 	bool     trigger_eof;
@@ -341,6 +344,7 @@ struct cam_req_mgr_core_dev_link_setup {
  * @link_hdl         : link identifier
  * @dev_hdl          : device handle for cross check
  * @request_id       : request id settings to apply
+ * @max_pd_req_id    : request id applied by max pd device
  * @report_if_bubble : report to crm if failure in applying
  * @trigger_point    : the trigger point of this apply
  * @re_apply         : to skip re_apply for buf_done request
@@ -350,6 +354,7 @@ struct cam_req_mgr_apply_request {
 	int32_t    link_hdl;
 	int32_t    dev_hdl;
 	uint64_t   request_id;
+	int64_t    max_pd_req_id;
 	int32_t    report_if_bubble;
 	uint32_t   trigger_point;
 	bool       re_apply;
@@ -375,11 +380,14 @@ struct cam_req_mgr_flush_request {
  * @link_hdl          : link handle
  * @req_id            : request id
  * @evt_type          : link event
+ * @try_for_recovery  : Link is stalled allow subdevices to recover if
+ *                      possible
  */
 struct cam_req_mgr_link_evt_data {
 	int32_t  link_hdl;
 	int32_t  dev_hdl;
 	uint64_t req_id;
+	bool     try_for_recovery;
 	enum cam_req_mgr_link_evt_type evt_type;
 	union {
 		enum cam_req_mgr_device_error error;

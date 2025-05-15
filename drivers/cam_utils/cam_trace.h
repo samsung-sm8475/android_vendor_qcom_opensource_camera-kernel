@@ -3,6 +3,7 @@
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
  */
 
+#include "linux/types.h"
 #if !defined(_CAM_TRACE_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _CAM_TRACE_H
 

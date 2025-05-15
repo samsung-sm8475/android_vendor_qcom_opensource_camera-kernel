@@ -456,8 +456,6 @@ static int cam_sfe_bus_start_rm(struct cam_isp_resource_node *rm_res)
 		rm_data->hw_regs->buf_width);
 	cam_io_w_mb(rm_data->height, common_data->mem_base +
 		rm_data->hw_regs->buf_height);
-	cam_io_w_mb(rm_data->stride, common_data->mem_base +
-		rm_data->hw_regs->stride);
 	cam_io_w_mb(rm_data->unpacker_cfg, common_data->mem_base +
 		rm_data->hw_regs->unpacker_cfg);
 	cam_io_w_mb(rm_data->latency_buf_allocation, common_data->mem_base +
@@ -934,7 +932,8 @@ static int cam_sfe_bus_start_bus_rd(
 	bus_priv = rsrc_data->bus_priv;
 	common_data = rsrc_data->common_data;
 
-	CAM_DBG(CAM_SFE, "SFE:%d start RD type:0x%x", sfe_bus_rd->res_id);
+	CAM_DBG(CAM_SFE, "SFE:%d start RD type:0x%x",
+		sfe_bus_rd->hw_intf->hw_idx, sfe_bus_rd->res_id);
 
 	if (sfe_bus_rd->res_state != CAM_ISP_RESOURCE_STATE_RESERVED) {
 		CAM_ERR(CAM_SFE, "Invalid resource state:%d",

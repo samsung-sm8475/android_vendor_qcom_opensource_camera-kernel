@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <media/cam_defs.h>
@@ -67,8 +66,8 @@ int cam_isp_add_change_base(
 			hw_entry[num_ent].len    = get_base.cmd.used_bytes;
 			hw_entry[num_ent].offset = kmd_buf_info->offset;
 
-			/* Marking change base as COMMON_CFG */
-			hw_entry[num_ent].flags  = CAM_ISP_COMMON_CFG_BL;
+			/* Marking change base as IOCFG to reapply on bubble */
+			hw_entry[num_ent].flags  = CAM_ISP_CFG_COMMON;
 			CAM_DBG(CAM_ISP,
 				"num_ent=%d handle=0x%x, len=%u, offset=%u",
 				num_ent,
@@ -120,7 +119,6 @@ static int cam_isp_update_dual_config(
 		(cmd_desc->offset >=
 		(len - sizeof(struct cam_isp_dual_config)))) {
 		CAM_ERR(CAM_ISP, "not enough buffer provided");
-		cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 		return -EINVAL;
 	}
 	remain_len = len - cmd_desc->offset;
@@ -131,7 +129,6 @@ static int cam_isp_update_dual_config(
 		sizeof(struct cam_isp_dual_stripe_config)) >
 		(remain_len - offsetof(struct cam_isp_dual_config, stripes))) {
 		CAM_ERR(CAM_ISP, "not enough buffer for all the dual configs");
-		cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 		return -EINVAL;
 	}
 	for (i = 0; i < dual_config->num_ports; i++) {
@@ -189,7 +186,6 @@ static int cam_isp_update_dual_config(
 	}
 
 end:
-	cam_mem_put_cpu_buf(cmd_desc->mem_handle);
 	return rc;
 }
 
@@ -682,6 +678,7 @@ int cam_sfe_add_command_buffers(
 	return rc;
 }
 
+
 static void cam_isp_validate_for_sfe_scratch(
 	struct cam_isp_sfe_scratch_buf_res_info *sfe_res_info,
 	uint32_t res_type, uint32_t out_base)
@@ -691,16 +688,17 @@ static void cam_isp_validate_for_sfe_scratch(
 	if ((res_id_out) < ((out_base & 0xFF) +
 		sfe_res_info->num_active_fe_rdis)) {
 		CAM_DBG(CAM_ISP,
-			"Buffer found for SFE port: 0x%x - skip scratch buffer",
+			"SFE Write/Fetch engine cfg skip scratch buffer for res 0x%x",
 			res_type);
-		sfe_res_info->sfe_rdi_cfg_mask |= (1 << res_id_out);
-	}
+		sfe_res_info->sfe_rdi_cfg_mask |= 1 << res_id_out;
+	}	
 }
 
 static void cam_isp_validate_for_ife_scratch(
 	struct cam_isp_ife_scratch_buf_res_info *ife_res_info,
 	uint32_t res_type)
 {
+
 	int i;
 
 	for (i = 0; i < ife_res_info->num_ports; i++) {
@@ -708,10 +706,11 @@ static void cam_isp_validate_for_ife_scratch(
 			CAM_DBG(CAM_ISP,
 				"Buffer found for IFE port: 0x%x - skip scratch buffer",
 				res_type);
-			ife_res_info->ife_scratch_cfg_mask |= (1 << i);
+			ife_res_info->ife_scratch_cfg_mask &= (~(1 << i));
 		}
 	}
 }
+
 
 int cam_isp_add_io_buffers(
 	int                                      iommu_hdl,
@@ -786,19 +785,19 @@ int cam_isp_add_io_buffers(
 
 			res_id_out = io_cfg[i].resource_type & 0xFF;
 			if ((hw_type == CAM_ISP_HW_TYPE_SFE)  &&
-				(scratch_check_cfg->validate_for_sfe)) {
+				(scratch_check_cfg->check_for_sfe)) {
 				struct cam_isp_sfe_scratch_buf_res_info *sfe_res_info =
 					&scratch_check_cfg->sfe_scratch_res_info;
-
+				
 				cam_isp_validate_for_sfe_scratch(sfe_res_info,
 					io_cfg[i].resource_type, out_base);
 			}
 
 			if ((hw_type == CAM_ISP_HW_TYPE_VFE) &&
-				(scratch_check_cfg->validate_for_ife)) {
+				(scratch_check_cfg->check_for_ife)) {
 				struct cam_isp_ife_scratch_buf_res_info *ife_res_info =
 					&scratch_check_cfg->ife_scratch_res_info;
-
+				
 				cam_isp_validate_for_ife_scratch(ife_res_info,
 					io_cfg[i].resource_type);
 			}
@@ -1281,8 +1280,8 @@ int cam_isp_add_reg_update(
 		prepare->hw_update_entries[num_ent].offset =
 			kmd_buf_info->offset;
 
-		/* Marking reg update as COMMON */
-		prepare->hw_update_entries[num_ent].flags = CAM_ISP_COMMON_CFG_BL;
+		/* Marking reg update as IOCFG to reapply on bubble */
+		prepare->hw_update_entries[num_ent].flags = CAM_ISP_IOCFG_BL;
 		CAM_DBG(CAM_ISP,
 			"num_ent=%d handle=0x%x, len=%u, offset=%u",
 			num_ent,
@@ -1376,7 +1375,7 @@ int cam_isp_add_go_cmd(
 		prepare->hw_update_entries[num_ent].len = reg_update_size;
 		prepare->hw_update_entries[num_ent].offset =
 			kmd_buf_info->offset;
-		prepare->hw_update_entries[num_ent].flags = CAM_ISP_COMMON_CFG_BL;
+		prepare->hw_update_entries[num_ent].flags = CAM_ISP_IOCFG_BL;
 		CAM_DBG(CAM_ISP,
 			"num_ent=%d handle=0x%x, len=%u, offset=%u",
 			num_ent,
@@ -1791,8 +1790,8 @@ int cam_isp_add_csid_reg_update(
 		prepare->hw_update_entries[num_ent].offset =
 			kmd_buf_info->offset;
 
-		/* Marking reg update as COMMON */
-		prepare->hw_update_entries[num_ent].flags = CAM_ISP_COMMON_CFG_BL;
+		/* Marking reg update as common */
+		prepare->hw_update_entries[num_ent].flags = CAM_ISP_CFG_COMMON;
 		CAM_DBG(CAM_ISP,
 			"num_ent=%d handle=0x%x, len=%u, offset=%u",
 			num_ent,
@@ -1889,8 +1888,8 @@ go_cmd_added:
 		prepare->hw_update_entries[num_ent].offset =
 			kmd_buf_info->offset;
 
-		/* Marking go update as COMMON */
-		prepare->hw_update_entries[num_ent].flags = CAM_ISP_COMMON_CFG_BL;
+		/* Marking go update as IOCFG to reapply on bubble */
+		prepare->hw_update_entries[num_ent].flags = CAM_ISP_IOCFG_BL;
 		CAM_DBG(CAM_ISP,
 			"num_ent=%d handle=0x%x, len=%u, offset=%u",
 			num_ent,

@@ -90,4 +90,12 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl, void *arg);
  */
 void cam_sensor_shutdown(struct cam_sensor_ctrl_t *s_ctrl);
 
+/**
+ * @s_ctrl: Sensor ctrl structure
+ * @is_aeb_on:    AEB ON/OFF Flag
+ *
+ * This API gives AEB status
+ */
+int cam_sensor_check_aeb_status(struct cam_sensor_ctrl_t *s_ctrl, uint32_t *is_aeb_on);
+
 #endif /* _CAM_SENSOR_CORE_H_ */

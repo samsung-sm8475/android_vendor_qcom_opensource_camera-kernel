@@ -333,4 +333,6 @@ int cam_irq_controller_register_dependent(void *primary_controller, void *second
  */
 int cam_irq_controller_unregister_dependent(void *primary_controller, void *secondary_controller);
 
+void cam_irq_controller_enable_trace(void *irq_controller);
+
 #endif /* _CAM_IRQ_CONTROLLER_H_ */

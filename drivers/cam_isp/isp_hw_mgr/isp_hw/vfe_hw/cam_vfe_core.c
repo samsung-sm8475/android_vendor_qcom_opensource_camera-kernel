@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/delay.h>
@@ -512,13 +511,13 @@ int cam_vfe_process_cmd(void *hw_priv, uint32_t cmd_type,
 	case CAM_ISP_HW_CMD_ADD_WAIT:
 	case CAM_ISP_HW_CMD_ADD_WAIT_TRIGGER:
 	case CAM_ISP_HW_CMD_CAMIF_DATA:
-	case CAM_ISP_HW_NOTIFY_OVERFLOW:
+	case CAM_ISP_HW_DUMP_REG_ON_ERROR:
 	case CAM_ISP_HW_CMD_BLANKING_UPDATE:
 	case CAM_ISP_HW_CMD_FE_UPDATE_IN_RD:
 	case CAM_ISP_HW_CMD_GET_PATH_PORT_MAP:
 	case CAM_ISP_HW_CMD_APPLY_CLK_BW_UPDATE:
 	case CAM_ISP_HW_CMD_INIT_CONFIG_UPDATE:
-	case CAM_ISP_HW_CMD_RDI_LCR_CFG:
+	case CAM_ISP_HW_CMD_DUMP_IRQ_MONITOR:
 		rc = core_info->vfe_top->hw_ops.process_cmd(
 			core_info->vfe_top->top_priv, cmd_type, cmd_args,
 			arg_size);
@@ -539,7 +538,6 @@ int cam_vfe_process_cmd(void *hw_priv, uint32_t cmd_type,
 	case CAM_ISP_HW_CMD_WM_BW_LIMIT_CONFIG:
 	case CAM_ISP_HW_BUS_MINI_DUMP:
 	case CAM_ISP_HW_CMD_BUF_UPDATE:
-	case CAM_ISP_HW_USER_DUMP:
 		rc = core_info->vfe_bus->hw_ops.process_cmd(
 			core_info->vfe_bus->bus_priv, cmd_type, cmd_args,
 			arg_size);
@@ -547,7 +545,6 @@ int cam_vfe_process_cmd(void *hw_priv, uint32_t cmd_type,
 	case CAM_ISP_HW_CMD_GET_HFR_UPDATE_RM:
 	case CAM_ISP_HW_CMD_GET_BUF_UPDATE_RM:
 	case CAM_ISP_HW_CMD_FE_UPDATE_BUS_RD:
-	case CAM_ISP_HW_CMD_GET_RM_SECURE_MODE:
 		if (core_info->vfe_rd_bus)
 			rc = core_info->vfe_rd_bus->hw_ops.process_cmd(
 				core_info->vfe_rd_bus->bus_priv, cmd_type,

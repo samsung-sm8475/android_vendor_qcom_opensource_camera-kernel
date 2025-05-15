@@ -31,7 +31,7 @@ static int cam_vfe_top_set_axi_bw_vote(struct cam_vfe_top_priv_common *top_commo
 	soc_info = top_common->soc_info;
 	soc_private = (struct cam_vfe_soc_private *)soc_info->soc_private;
 
-	CAM_DBG(CAM_PERF, "VFE:%d Sending final BW to cpas bw_state:%s bw_vote:%llu req_id:%ld",
+	CAM_INFO(CAM_PERF, "VFE:%d Sending final BW to cpas bw_state:%s bw_vote:%llu req_id:%ld",
 		top_common->hw_idx, cam_vfe_top_clk_bw_state_to_string(top_common->bw_state),
 		total_bw_new_vote, (start_stop ? -1 : request_id));
 	rc = cam_cpas_update_axi_vote(soc_private->cpas_handle,
@@ -146,7 +146,7 @@ static int cam_vfe_top_calc_hw_clk_rate(
 			max_req_clk_rate = top_common->req_clk_rate[i];
 	}
 
-	if (start_stop && !top_common->skip_data_rst_on_stop) {
+	if (start_stop && !top_common->skip_clk_data_rst) {
 		/* need to vote current clk immediately */
 		*final_clk_rate = max_req_clk_rate;
 		/* Reset everything, we can start afresh */
@@ -598,7 +598,7 @@ int cam_vfe_top_apply_clk_bw_update(struct cam_vfe_top_priv_common *top_common,
 	}
 
 	if (clk_bw_args->skip_clk_data_rst) {
-		top_common->skip_data_rst_on_stop = true;
+		top_common->skip_clk_data_rst = true;
 		CAM_DBG(CAM_ISP, "VFE:%u requested to avoid clk data rst", hw_intf->hw_idx);
 		return 0;
 	}
@@ -740,7 +740,7 @@ int cam_vfe_top_apply_clock_start_stop(struct cam_vfe_top_priv_common *top_commo
 
 end:
 	top_common->clk_state = CAM_CLK_BW_STATE_INIT;
-	top_common->skip_data_rst_on_stop = false;
+	top_common->skip_clk_data_rst = false;
 	return rc;
 }
 

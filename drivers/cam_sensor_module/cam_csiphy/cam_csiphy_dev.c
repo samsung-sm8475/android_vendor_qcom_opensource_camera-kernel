@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include "cam_csiphy_dev.h"
@@ -10,60 +9,89 @@
 #include "cam_csiphy_core.h"
 #include <media/cam_sensor.h>
 #include "camera_main.h"
-#include <dt-bindings/msm-camera.h>
+
+#if IS_ENABLED(CONFIG_SEC_ABC)
+#include <linux/sti/abc_common.h>
+#endif
+
+#if defined(CONFIG_USE_CAMERA_HW_BIG_DATA)
+#include "cam_sensor_cmn_header.h"
+#endif
 
 #define CSIPHY_DEBUGFS_NAME_MAX_SIZE 10
 static struct dentry *root_dentry;
 
-static inline void cam_csiphy_trigger_reg_dump(struct csiphy_device *csiphy_dev)
+#if defined(CONFIG_USE_CAMERA_HW_BIG_DATA)
+static void hw_bigdata_update_hw_param(uint32_t camera_id, struct cam_hw_param *hw_param)
 {
-	cam_csiphy_common_status_reg_dump(csiphy_dev);
-
-	if (csiphy_dev->en_full_phy_reg_dump)
-		cam_csiphy_reg_dump(&csiphy_dev->soc_info);
-
-	if (csiphy_dev->en_lane_status_reg_dump) {
-		CAM_INFO(CAM_CSIPHY, "Status Reg Dump on failure");
-		cam_csiphy_dump_status_reg(csiphy_dev);
+	if (hw_param->comp_chk) {
+		CAM_ERR(CAM_UTIL, "[HWB][Camera%d][MIPI_C] Err\n", camera_id);
+		hw_param->mipi_comp_err_cnt++;
 	}
+	else {
+		CAM_ERR(CAM_UTIL, "[HWB][Camera%d][MIPI_S] Err\n", camera_id);
+		hw_param->mipi_sensor_err_cnt++;
+	}
+	hw_param->mipi_chk = TRUE;
+	hw_param->need_update_to_file = TRUE;
 }
 
-static void cam_csiphy_subdev_handle_message(struct v4l2_subdev *sd,
-	enum cam_subdev_message_type_t message_type, void *data)
+static void hw_bigdata_count_mipi_error()
+{
+	uint32_t camera_id;
+	struct cam_hw_param *hw_param = NULL;
+	msm_is_sec_get_sensor_position(&camera_id);
+	if (msm_is_sec_get_hw_param(camera_id, &hw_param)) 
+		return;
+
+	if (hw_param !=NULL && hw_param->mipi_chk == FALSE)
+		hw_bigdata_update_hw_param(camera_id, hw_param);
+}
+#endif
+
+static void cam_csiphy_subdev_handle_message(
+		struct v4l2_subdev *sd,
+		enum cam_subdev_message_type_t message_type,
+		struct cam_subdev_msg_payload *msg)
 {
 	struct csiphy_device *csiphy_dev = v4l2_get_subdevdata(sd);
-	uint32_t phy_idx;
-
-	if (!data) {
-		CAM_ERR(CAM_CSIPHY, "Empty Payload");
-		return;
-	}
-
-	phy_idx = *(uint32_t *)data;
-	if (phy_idx != csiphy_dev->soc_info.index) {
-		CAM_DBG(CAM_CSIPHY, "Current HW IDX: %u, Expected IDX: %u",
-			csiphy_dev->soc_info.index, phy_idx);
-		return;
-	}
+	bool is_aux_setting_required = 0;
 
 	switch (message_type) {
-	case CAM_SUBDEV_MESSAGE_REG_DUMP: {
-		cam_csiphy_trigger_reg_dump(csiphy_dev);
+	case CAM_SUBDEV_MESSAGE_IRQ_ERR:
+		if (msg->hw_idx == csiphy_dev->soc_info.index) {
+#if IS_ENABLED(CONFIG_SEC_ABC)
+			sec_abc_send_event("MODULE=camera@WARN=mipi_overflow");
+#endif
+#if defined(CONFIG_USE_CAMERA_HW_BIG_DATA)
+			hw_bigdata_count_mipi_error();
+#endif
+			if (msg->priv_data)
+				is_aux_setting_required = *(bool *)(msg->priv_data);
 
-		break;
-	}
-	case CAM_SUBDEV_MESSAGE_APPLY_CSIPHY_AUX: {
-		cam_csiphy_trigger_reg_dump(csiphy_dev);
+			CAM_INFO(CAM_CSIPHY, "subdev index : %d CSIPHY index: %d Aux_setting_reqrd: %s",
+				csiphy_dev->soc_info.index, msg->hw_idx,
+				CAM_BOOL_TO_YESNO(is_aux_setting_required));
 
-		if (!csiphy_dev->skip_aux_settings) {
-			cam_csiphy_update_auxiliary_mask(csiphy_dev);
+			if (is_aux_setting_required)
+				cam_csiphy_apply_aux_settings(csiphy_dev);
 
-			CAM_INFO(CAM_CSIPHY,
-				"CSIPHY[%u] updating aux settings for data rate idx: %u",
-				csiphy_dev->soc_info.index, csiphy_dev->curr_data_rate_idx);
+			cam_csiphy_common_status_reg_dump(csiphy_dev);
+
+			cam_csiphy_reg_dump(&csiphy_dev->soc_info);
+
+			if (csiphy_dev->en_lane_status_reg_dump) {
+				CAM_INFO(CAM_CSIPHY,
+					"Status Reg Dump on failure");
+				cam_csiphy_dump_status_reg(csiphy_dev);
+			}
+#ifdef CONFIG_CAMERA_SKIP_SECURE_PAGE_FAULT
+			if (cam_csiphy_is_secure_mode(csiphy_dev)) {
+				cam_csiphy_set_secure_irq_err(true);
+			}
+#endif
 		}
 		break;
-	}
 	default:
 		break;
 	}
@@ -106,9 +134,6 @@ static int cam_csiphy_debug_register(struct csiphy_device *csiphy_dev)
 
 	debugfs_create_bool("en_full_phy_reg_dump", 0644,
 		dbgfileptr, &csiphy_dev->en_full_phy_reg_dump);
-
-	debugfs_create_bool("skip_aux_settings", 0644,
-		dbgfileptr, &csiphy_dev->skip_aux_settings);
 
 	return 0;
 }
@@ -269,21 +294,10 @@ static int cam_csiphy_component_bind(struct device *dev,
 	new_csiphy_dev->soc_info.dev = &pdev->dev;
 	new_csiphy_dev->soc_info.dev_name = pdev->name;
 	new_csiphy_dev->ref_count = 0;
-	new_csiphy_dev->current_data_rate = 0;
 
 	rc = cam_csiphy_parse_dt_info(pdev, new_csiphy_dev);
 	if (rc < 0) {
 		CAM_ERR(CAM_CSIPHY, "DT parsing failed: %d", rc);
-		goto csiphy_no_resource;
-	}
-
-	/* validate PHY fuse only for CSIPHY4 */
-	if ((new_csiphy_dev->soc_info.index == 4) &&
-		!cam_cpas_is_feature_supported(
-			CAM_CPAS_CSIPHY_FUSE,
-			(1 << new_csiphy_dev->soc_info.index), NULL)) {
-		CAM_ERR(CAM_CSIPHY, "PHY%d is not supported",
-			new_csiphy_dev->soc_info.index);
 		goto csiphy_no_resource;
 	}
 
@@ -325,7 +339,6 @@ static int cam_csiphy_component_bind(struct device *dev,
 		new_csiphy_dev->csiphy_info[i].lane_cnt = 0;
 		new_csiphy_dev->csiphy_info[i].lane_assign = 0;
 		new_csiphy_dev->csiphy_info[i].lane_enable = 0;
-		new_csiphy_dev->csiphy_info[i].mipi_flags = 0;
 	}
 
 	new_csiphy_dev->ops.get_dev_info = NULL;
@@ -334,7 +347,6 @@ static int cam_csiphy_component_bind(struct device *dev,
 
 	new_csiphy_dev->acquire_count = 0;
 	new_csiphy_dev->start_dev_count = 0;
-	new_csiphy_dev->preamble_enable = 0;
 
 	cpas_parms.cam_cpas_client_cb = NULL;
 	cpas_parms.cell_index = new_csiphy_dev->soc_info.index;
@@ -356,6 +368,16 @@ static int cam_csiphy_component_bind(struct device *dev,
 	snprintf(wq_name, 32, "%s%d%s", "csiphy",
 		new_csiphy_dev->soc_info.index, "_wq");
 
+	new_csiphy_dev->work_queue = alloc_workqueue("wq_name",
+		WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
+	if (!new_csiphy_dev->work_queue) {
+		CAM_ERR(CAM_CSIPHY,
+			"Error allocating workqueue for csiphy: %d",
+			new_csiphy_dev->soc_info.index);
+		rc = -ENOMEM;
+		goto cpas_unregister;
+	}
+
 	rc = cam_csiphy_register_baseaddress(new_csiphy_dev);
 	if (rc) {
 		CAM_ERR(CAM_CSIPHY, "Failed to register baseaddress, rc: %d", rc);
@@ -371,6 +393,8 @@ static int cam_csiphy_component_bind(struct device *dev,
 
 cpas_unregister:
 	cam_cpas_unregister_client(new_csiphy_dev->cpas_handle);
+	if (new_csiphy_dev->work_queue)
+		destroy_workqueue(new_csiphy_dev->work_queue);
 csiphy_unregister_subdev:
 	cam_unregister_subdev(&(new_csiphy_dev->v4l2_dev_str));
 csiphy_no_resource:

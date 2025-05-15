@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef _CAM_REQ_MGR_CORE_H_
 #define _CAM_REQ_MGR_CORE_H_
@@ -15,12 +14,11 @@
 #define CAM_REQ_MGR_MAX_LINKED_DEV     16
 #define MAX_REQ_SLOTS                  48
 
-#define CAM_REQ_MGR_WATCHDOG_TIMEOUT          1000
+#define CAM_REQ_MGR_WATCHDOG_TIMEOUT          5000
 #define CAM_REQ_MGR_WATCHDOG_TIMEOUT_DEFAULT  5000
 #define CAM_REQ_MGR_WATCHDOG_TIMEOUT_MAX      50000
 #define CAM_REQ_MGR_SCHED_REQ_TIMEOUT         1000
 #define CAM_REQ_MGR_SIMULATE_SCHED_REQ        30
-#define CAM_REQ_MGR_DEFAULT_HDL_VAL           0
 
 #define FORCE_DISABLE_RECOVERY  2
 #define FORCE_ENABLE_RECOVERY   1
@@ -97,6 +95,7 @@ struct crm_task_payload {
 		struct cam_req_mgr_trigger_notify       notify_trigger;
 		struct cam_req_mgr_error_notify         notify_err;
 	} u;
+	bool seek_full_recovery;
 };
 
 /**
@@ -337,6 +336,17 @@ struct cam_req_mgr_connected_device {
 	void                           *parent;
 };
 
+#define CAM_REQ_MGR_MAX_MONITOR_ENTRIES 5
+
+/* struct cam_req_mgr_link_monitor
+ *   -req_mgr apply monitor
+ */
+struct cam_req_mgr_link_monitor {
+	int64_t req_id;
+	int     idx;
+	struct  timespec64 ts;
+};
+
 /**
  * struct cam_req_mgr_core_link
  * -  Link Properties
@@ -362,6 +372,10 @@ struct cam_req_mgr_connected_device {
  * @link_state_spin_lock : spin lock to protect link state variable
  * @sync_link            : array of pointer to the sync link for synchronization
  * @num_sync_links       : num of links sync associated with this link
+ * @max_retry_threshold  : max number of frames to wait prior to triggering recovery
+ *                         for a given link
+ * @monitor_head         : head of CRM apply monitor
+ * @monitor              : CRM apply monitor
  * @sync_link_sof_skip   : flag determines if a pkt is not available for a given
  *                         frame in a particular link skip corresponding
  *                         frame in sync link as well.
@@ -409,6 +423,9 @@ struct cam_req_mgr_core_link {
 	struct cam_req_mgr_core_link
 			*sync_link[MAXIMUM_LINKS_PER_SESSION - 1];
 	int32_t                              num_sync_links;
+	uint32_t                             max_retry_threshold;
+	atomic64_t                           monitor_head;
+	struct cam_req_mgr_link_monitor      monitor[CAM_REQ_MGR_MAX_MONITOR_ENTRIES];
 	bool                                 sync_link_sof_skip;
 	uint32_t                             open_req_cnt;
 	int64_t                              last_flush_id;
@@ -428,6 +445,7 @@ struct cam_req_mgr_core_link {
 	bool                                 skip_init_frame;
 	uint64_t                             last_sof_trigger_jiffies;
 	bool                                 wq_congestion;
+	bool                                 try_for_internal_recovery;
 };
 
 /**

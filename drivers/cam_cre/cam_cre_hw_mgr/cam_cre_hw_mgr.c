@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
@@ -33,24 +32,6 @@
 #include "cam_compat.h"
 
 static struct cam_cre_hw_mgr *cre_hw_mgr;
-
-static bool cam_cre_debug_clk_update(struct cam_cre_clk_info *hw_mgr_clk_info)
-{
-	if (cre_hw_mgr->cre_debug_clk &&
-		cre_hw_mgr->cre_debug_clk != hw_mgr_clk_info->curr_clk) {
-		hw_mgr_clk_info->base_clk = cre_hw_mgr->cre_debug_clk;
-		hw_mgr_clk_info->curr_clk = cre_hw_mgr->cre_debug_clk;
-		hw_mgr_clk_info->uncompressed_bw = cre_hw_mgr->cre_debug_clk;
-		hw_mgr_clk_info->compressed_bw = cre_hw_mgr->cre_debug_clk;
-		CAM_DBG(CAM_PERF, "bc = %d cc = %d ub %d cb %d",
-			hw_mgr_clk_info->base_clk, hw_mgr_clk_info->curr_clk,
-			hw_mgr_clk_info->uncompressed_bw,
-			hw_mgr_clk_info->compressed_bw);
-		return true;
-	}
-
-	return false;
-}
 
 static struct cam_cre_io_buf_info *cam_cre_mgr_get_rsc(
 	struct cam_cre_ctx *ctx_data,
@@ -746,7 +727,7 @@ static void cam_cre_device_timer_stop(struct cam_cre_hw_mgr *hw_mgr)
 
 static int cam_cre_mgr_process_cmd(void *priv, void *data)
 {
-	int rc = 0, i = 0;
+	int rc = 0;
 	struct cre_cmd_work_data *task_data = NULL;
 	struct cam_cre_ctx *ctx_data;
 	struct cam_cre_request *cre_req;
@@ -797,12 +778,6 @@ static int cam_cre_mgr_process_cmd(void *priv, void *data)
 	}
 	hw_mgr = task_data->data;
 	num_batch = cre_req->num_batch;
-
-	if (num_batch > CRE_MAX_BATCH_SIZE) {
-		CAM_WARN(CAM_CRE, "num_batch = %u is greater than max",
-				num_batch);
-		num_batch = CRE_MAX_BATCH_SIZE;
-	}
 
 	CAM_DBG(CAM_CRE,
 		"Going to configure cre for req %d, req_idx %d num_batch %d",
@@ -892,10 +867,8 @@ static int32_t cam_cre_mgr_process_msg(void *priv, void *data)
 		active_req_idx, ctx->last_done_req_idx);
 
 	active_req = ctx->req_list[active_req_idx];
-	if (!active_req) {
+	if (!active_req)
 		CAM_ERR(CAM_CRE, "Active req cannot be null");
-		return -EINVAL;
-	}
 
 	if (irq_data.error) {
 		evt_id = CAM_CTX_EVT_ID_ERROR;
@@ -1227,9 +1200,6 @@ static bool cam_cre_check_clk_update(struct cam_cre_hw_mgr *hw_mgr,
 		clk_info->frame_cycles, clk_info->budget_ns);
 	ctx_data->clk_info.rt_flag = clk_info->rt_flag;
 
-	if (cre_hw_mgr->cre_debug_clk)
-		return cam_cre_debug_clk_update(hw_mgr_clk_info);
-
 	if (busy)
 		rc = cam_cre_update_clk_busy(hw_mgr, ctx_data,
 			hw_mgr_clk_info, clk_info, base_clk);
@@ -1497,8 +1467,7 @@ static int cam_cre_mgr_pkt_validation(struct cam_packet *packet)
 		return -EINVAL;
 	}
 
-	if (!packet->num_io_configs ||
-		packet->num_io_configs > CRE_MAX_IO_BUFS) {
+	if (packet->num_io_configs > CRE_MAX_IO_BUFS) {
 		CAM_ERR(CAM_CRE, "Invalid number of io configs: %d %d",
 			CRE_MAX_IO_BUFS, packet->num_io_configs);
 		return -EINVAL;
@@ -2009,7 +1978,7 @@ static int cam_cre_mgr_release_hw(void *hw_priv, void *hw_release_args)
 	mutex_lock(&hw_mgr->hw_mgr_mutex);
 	rc = cam_cre_mgr_release_ctx(hw_mgr, ctx_id);
 	if (!hw_mgr->cre_ctx_cnt) {
-		CAM_DBG(CAM_CRE, "Last Release #of CRE %d", cre_hw_mgr->num_cre);
+		CAM_DBG(CAM_CRE, "Last Release");
 		for (i = 0; i < cre_hw_mgr->num_cre; i++) {
 			dev_intf = hw_mgr->cre_dev_intf[i];
 			irq_cb.cre_hw_mgr_cb = NULL;
@@ -2148,13 +2117,13 @@ static int cam_cre_process_generic_cmd_buffer(
 		if (!cmd_desc[i].length)
 			continue;
 
-		if (cmd_desc[i].meta_data != CAM_CRE_CMD_META_GENERIC_BLOB)
-			continue;
+	if (cmd_desc[i].meta_data != CAM_CRE_CMD_META_GENERIC_BLOB)
+		continue;
 
-		rc = cam_packet_util_process_generic_cmd_buffer(&cmd_desc[i],
-				cam_cre_packet_generic_blob_handler, &cmd_generic_blob);
-		if (rc)
-			CAM_ERR(CAM_CRE, "Failed in processing blobs %d", rc);
+	rc = cam_packet_util_process_generic_cmd_buffer(&cmd_desc[i],
+		cam_cre_packet_generic_blob_handler, &cmd_generic_blob);
+	if (rc)
+		CAM_ERR(CAM_CRE, "Failed in processing blobs %d", rc);
 	}
 
 	return rc;
@@ -2881,25 +2850,8 @@ cmd_work_failed:
 	return rc;
 }
 
-static int cam_cre_set_dbg_default_clk(void *data, u64 val)
-{
-	cre_hw_mgr->cre_debug_clk = val;
-	return 0;
-}
-
-static int cam_cre_get_dbg_default_clk(void *data, u64 *val)
-{
-	*val = cre_hw_mgr->cre_debug_clk;
-	return 0;
-}
-DEFINE_DEBUGFS_ATTRIBUTE(cam_cre_debug_default_clk,
-	cam_cre_get_dbg_default_clk,
-	cam_cre_set_dbg_default_clk, "%16llu");
-
 static int cam_cre_create_debug_fs(void)
 {
-	struct dentry *dbgfileptr = NULL;
-	int rc = 0;
 	cre_hw_mgr->dentry = debugfs_create_dir("camera_cre",
 		NULL);
 
@@ -2917,15 +2869,6 @@ static int cam_cre_create_debug_fs(void)
 		goto err;
 	}
 
-	dbgfileptr = debugfs_create_file("cre_debug_clk", 0644,
-		cre_hw_mgr->dentry, NULL, &cam_cre_debug_default_clk);
-
-	if (IS_ERR(dbgfileptr)) {
-		if (PTR_ERR(dbgfileptr) == -ENODEV)
-			CAM_WARN(CAM_CRE, "DebugFS not enabled in kernel!");
-		else
-			rc = PTR_ERR(dbgfileptr);
-	}
 	return 0;
 err:
 	debugfs_remove_recursive(cre_hw_mgr->dentry);
@@ -3056,4 +2999,3 @@ cre_ctx_bitmap_failed:
 
 	return rc;
 }
-

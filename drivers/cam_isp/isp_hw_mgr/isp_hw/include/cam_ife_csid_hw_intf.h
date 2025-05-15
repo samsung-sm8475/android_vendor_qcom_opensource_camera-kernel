@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CAM_CSID_HW_INTF_H_
@@ -77,7 +76,6 @@ enum cam_ife_csid_secondary_evt_type {
  * @global_reset_en:      flag to indicate if global reset is enabled
  * @rup_en:               flag to indicate if rup is on csid side
  * @only_master_rup:      flag to indicate if only master RUP
- * @camif_irq_support:     flag to indicate if CSID supports CAMIF irq
  */
 struct cam_ife_csid_hw_caps {
 	uint32_t      num_rdis;
@@ -90,7 +88,6 @@ struct cam_ife_csid_hw_caps {
 	bool          global_reset_en;
 	bool          rup_en;
 	bool          only_master_rup;
-	bool          camif_irq_support;
 };
 
 struct cam_isp_out_port_generic_info {
@@ -160,13 +157,11 @@ struct cam_isp_in_port_generic_info {
  * struct cam_csid_secondary_evt_config - secondary event enablement
  * @evt_type:           Type of secondary event enabled [SOF/EPOCH/EOF...]
  * @en_secondary_evt:   Enable secondary event
- * @handle_camif_irq:    Flag to indicate if CSID IRQ is enabled
  *
  */
 struct cam_csid_secondary_evt_config {
 	enum cam_ife_csid_secondary_evt_type evt_type;
 	bool                                 en_secondary_evt;
-	bool                                 handle_camif_irq;
 };
 
 /**
@@ -197,14 +192,10 @@ struct cam_csid_secondary_evt_config {
  * @buf_done_controller: IRQ controller for buf done for version 680 hw
  * @cdm_ops:             CDM Ops
  * @event_cb:            Callback function to hw mgr in case of hw events
- * @phy_sel:             Phy selection number if tpg is enabled from userspace
  * @cb_priv:             Private pointer to return to callback
+ * @phy_sel:             Phy selection number if tpg is enabled from userspace
  * @can_use_lite:        Flag to indicate if current call qualifies for
  *                       acquire lite
- * @sfe_en:              Flag to indicate if SFE is enabled
- * @use_wm_pack:         [OUT]Flag to indicate if WM packing is to be used for packing
- * @secure_mode:         Holds secure mode state of the CSID
- * @handle_camif_irq:    Flag to indicate if CSID IRQ is enabled
  *
  */
 struct cam_csid_hw_reserve_resource_args {
@@ -227,12 +218,8 @@ struct cam_csid_hw_reserve_resource_args {
 	void                                     *cdm_ops;
 	cam_hw_mgr_event_cb_func                  event_cb;
 	uint32_t                                  phy_sel;
-	void                                     *cb_priv;
 	bool                                      can_use_lite;
-	bool                                      sfe_en;
-	bool                                      use_wm_pack;
-	bool                                      secure_mode;
-	bool                                      handle_camif_irq;
+	void                                     *cb_priv;
 };
 
 /**
@@ -281,18 +268,27 @@ struct cam_ife_csid_hw_halt_args {
  *             halt at frame boundary and wait for frame boundary
  * @node_res :  reource pointer array( ie cid or CSID)
  * @num_res :   number of resources to be stopped
+ * @internal_stop: Stop triggered within kernel
+ * @reset_timed_out: Set if CSID reset timed out
  *
  */
 struct cam_csid_hw_stop_args {
 	enum cam_ife_csid_halt_cmd                stop_cmd;
 	struct cam_isp_resource_node            **node_res;
 	uint32_t                                  num_res;
+	bool                                      internal_stop;
+        bool                                      reset_timed_out;
 };
 
+/**
+ * struct cam_csid_hw_start_args- start all resources
+ * @node_res :  reource pointer array( ie cid or CSID)
+ * @num_res :   number of resources to be stopped
+ *
+ */
 struct cam_csid_hw_start_args {
 	struct cam_isp_resource_node            **node_res;
 	uint32_t                                  num_res;
-	bool                                      is_internal_start;
 };
 
 
@@ -467,6 +463,19 @@ struct cam_ife_csid_mode_switch_update_args {
 struct cam_ife_csid_discard_init_frame_args {
 	uint32_t                          num_frames;
 	struct cam_isp_resource_node     *res;
+};
+
+/*
+ * struct cam_ife_csid_debug_cfg_args:
+ *
+ * @csid_debug: CSID debug val
+ * @csid_rx_capture_debug: CSID rx capture debug val
+ * @rx_capture_debug_set: CSID rx capture debug set;
+ */
+struct cam_ife_csid_debug_cfg_args {
+	uint64_t                          csid_debug;
+	uint32_t                          csid_rx_capture_debug;
+	bool                              rx_capture_debug_set;
 };
 
 #endif /* _CAM_CSID_HW_INTF_H_ */

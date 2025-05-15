@@ -12,7 +12,8 @@
 #include "cam_irq_controller.h"
 #include "cam_debug_util.h"
 #include "cam_common_util.h"
-
+#include "linux/types.h"
+#include "cam_trace.h"
 
 /* Threshold for scheduling delay in ms */
 #define CAM_TASKLET_SCHED_TIME_THRESHOLD        5
@@ -334,6 +335,7 @@ static void cam_tasklet_action(unsigned long data)
 	struct cam_tasklet_info          *tasklet_info = NULL;
 	struct cam_tasklet_queue_cmd     *tasklet_cmd = NULL;
 	ktime_t                           tasklet_exec_start_time;
+	uint32_t count = 0;
 
 	tasklet_info = (struct cam_tasklet_info *)data;
 
@@ -352,5 +354,9 @@ static void cam_tasklet_action(unsigned long data)
 			tasklet_exec_start_time,
 			CAM_TASKLET_EXE_TIME_THRESHOLD);
 		cam_tasklet_put_cmd(tasklet_info, (void **)(&tasklet_cmd));
+		count++;
+		if (count > CAM_TASKLETQ_SIZE / 4)
+			trace_printk("LOOP: count=%u\n", count);
 	}
+	trace_printk("EXIT: count=%u\n", count);
 }
